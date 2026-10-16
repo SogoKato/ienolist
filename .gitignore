@@ -1,0 +1,10 @@
+# Previous prototype (separate repository, kept locally only)
+legacy/
+
+node_modules/
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/
+.DS_Store
