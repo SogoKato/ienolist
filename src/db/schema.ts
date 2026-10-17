@@ -76,17 +76,21 @@ export const sessions = sqliteTable(
 
 // Join links for new members; with user_id set, a re-enrollment link for an
 // existing member who lost their passkeys.
-export const invites = sqliteTable("invites", {
-  id: text("id").primaryKey(),
-  tokenHash: text("token_hash").notNull().unique(),
-  householdId: text("household_id").notNull().references(() => households.id, { onDelete: "cascade" }),
-  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
-  role: text("role", { enum: ROLES }).notNull(),
-  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: integer("created_at").notNull(),
-  expiresAt: integer("expires_at").notNull(),
-  usedAt: integer("used_at"),
-});
+export const invites = sqliteTable(
+  "invites",
+  {
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull().unique(),
+    householdId: text("household_id").notNull().references(() => households.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ROLES }).notNull(),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    usedAt: integer("used_at"),
+  },
+  (t) => [check("invites_role", sql`${t.role} IN (${quoted(ROLES)})`)],
+);
 
 // Short-lived WebAuthn challenges (registration and sign-in ceremonies).
 export const challenges = sqliteTable(

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4d19adbc-56fe-4a5c-a057-fc752bf029ad",
+  "id": "876c8091-e756-4237-8d75-86316bd11156",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "app_meta": {
@@ -242,7 +242,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "invites_role": {
+          "name": "invites_role",
+          "value": "\"invites\".\"role\" IN ('admin', 'member')"
+        }
+      }
     },
     "item_events": {
       "name": "item_events",
