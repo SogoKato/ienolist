@@ -10,7 +10,7 @@ import {
   itemEvents,
   items,
 } from "../db/schema.ts";
-import { ulid } from "../lib/ulid.ts";
+import { monotonicUlid } from "../lib/ulid.ts";
 
 export type List = (typeof LISTS)[number];
 export type Item = typeof items.$inferSelect;
@@ -70,7 +70,7 @@ export type Deps = { now?: () => number; newId?: () => string };
 
 export function createItemService(db: Db, deps: Deps = {}) {
   const now = deps.now ?? (() => Math.floor(Date.now() / 1000));
-  const newId = deps.newId ?? ulid;
+  const newId = deps.newId ?? monotonicUlid();
 
   const scoped = (actor: Actor, id: string) => and(eq(items.id, id), eq(items.householdId, actor.householdId));
 

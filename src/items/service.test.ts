@@ -168,3 +168,42 @@ test("a failed event write rolls the item change back", async () => {
   assert.equal((await svc.get(home, item.id)).status, "in_stock");
   assert.deepEqual(await eventTypes(), ["created"]);
 });
+
+// The tests above fix ids and time; these use the service's real defaults.
+test("with real ids, items and events made in the same instant keep their order", async () => {
+  const t = createTestDb();
+  t.raw.exec("INSERT INTO households (id, name, created_at) VALUES ('h1', 'Home', 0)");
+  const real = createItemService(t.db);
+  const actor: Actor = { householdId: "h1", userId: null, source: "web" };
+  const names = Array.from({ length: 50 }, (_, i) => `item ${String(i).padStart(2, "0")}`);
+  for (const name of names) await real.create(actor, { list: "shopping", name });
+  assert.deepEqual((await real.list(actor)).map((i) => i.name), names);
+
+  const [first] = await real.list(actor);
+  await real.update(actor, first.id, { name: "renamed", status: "bought", note: "n" });
+  const types = (await real.events(actor, { itemId: first.id })).map((e) => e.type);
+  assert.deepEqual(types, ["note_changed", "status_changed", "renamed", "created"]);
+});
+
+test("japanese names are stored as written, with full-width spaces trimmed", async () => {
+  const item = await svc.create(home, { list: "fridge", name: "　牛乳（成分無調整）　", note: "特売 🥛" });
+  assert.equal(item.name, "牛乳（成分無調整）");
+  assert.equal((await svc.get(home, item.id)).note, "特売 🥛");
+  assert.equal((await svc.create(home, { list: "fridge", name: "あ".repeat(500) })).name.length, 500);
+  await rejects(svc.create(home, { list: "fridge", name: "あ".repeat(501) }), "invalid", /name must be/);
+});
+
+test("items created in the same second list in creation order", async () => {
+  for (const name of ["c", "a", "b"]) await svc.create(home, { list: "shopping", name });
+  assert.deepEqual((await svc.list(home)).map((i) => i.name), ["c", "a", "b"]);
+});
+
+test("get reports unknown ids as not found", async () => {
+  await rejects(svc.get(home, "nope"), "not_found", /Item not found/);
+});
+
+test("events never return more than 500 at once", async () => {
+  for (let i = 0; i < 501; i++) await svc.create(home, { list: "fridge", name: `item ${i}` });
+  assert.equal((await svc.events(home, { limit: 10_000 })).length, 500);
+  assert.equal((await svc.events(home)).length, 100);
+});
