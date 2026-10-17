@@ -43,3 +43,22 @@ test("a missing or malformed PUBLIC_URL is a clear error", () => {
     assert.throws(() => loadConfig({ PUBLIC_URL: value }), (e: unknown) => e instanceof ConfigError && message.test(e.message), String(value));
   }
 });
+
+test("pre-registered OAuth clients are read from JSON", () => {
+  const clients = [{ clientId: "my-app", name: "My app", redirectUris: ["https://app.example/cb"] }];
+  assert.deepEqual(loadConfig({ PUBLIC_URL: "https://a.example", OAUTH_CLIENTS: JSON.stringify(clients) }).oauthClients, clients);
+  assert.deepEqual(loadConfig({ PUBLIC_URL: "https://a.example" }).oauthClients, []);
+  assert.deepEqual(loadConfig({ PUBLIC_URL: "https://a.example", OAUTH_CLIENTS: "  " }).oauthClients, []);
+});
+
+test("malformed OAuth client settings are a clear error", () => {
+  for (const [value, message] of [
+    ["{", /not valid JSON/],
+    ["{}", /must be a JSON array/],
+    ['[{"clientId":"a","name":"A"}]', /must be a JSON array/],
+    ['[{"clientId":"a","name":"A","redirectUris":[]}]', /must be a JSON array/],
+    ['[{"clientId":"a","name":"A","redirectUris":["nope"]}]', /must be a JSON array/],
+  ] as const) {
+    assert.throws(() => loadConfig({ PUBLIC_URL: "https://a.example", OAUTH_CLIENTS: value }), message, value);
+  }
+});

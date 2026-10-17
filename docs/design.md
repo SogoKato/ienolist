@@ -68,6 +68,15 @@
 - CORS: メタデータ、`/oauth/register`、`/oauth/token`、`/oauth/revoke`、`/mcp` は任意のオリジンから呼べる（Cookie を使わないため）。`/oauth/authorize` と `/api` は同一オリジンのみ。
 - 事前登録のクライアントは `createOAuthService` の `clients` で渡す（使われた時に DB へ反映される）。環境変数からの読み込みは、エントリポイントを作る時に足す。
 
+### 実行とデプロイ
+
+- エントリポイントは 2 つ。`src/worker.ts`（Cloudflare Workers + D1）と `src/node.ts`（Node + SQLite ファイル。`pnpm start`）。どちらも `src/main.ts` の `buildApp(db, env)` でサービスをつなぐ。
+- 設定: `PUBLIC_URL`（必須）、`SETUP_TOKEN`、`APP_NAME`、`OAUTH_CLIENTS`（事前登録クライアントの JSON 配列 `[{clientId, name, redirectUris}]`）。Node ではさらに `DATABASE_PATH`（既定 `./data/app.db`）と `PORT`（既定 8787）。Workers では vars / secrets。ローカルの Workers は `.dev.vars`。
+- スキーマは `drizzle/` の SQL。Node は起動時に未適用分を適用する（`_migrations` で記録）。D1 は `wrangler d1 migrations apply DB --local|--remote`。
+- ローカルの Workers: `.dev.vars` に `PUBLIC_URL=http://localhost:8787` → `wrangler d1 migrations apply DB --local` → `pnpm dev`。
+- `pnpm e2e`: 実際の HTTP で、セットアップ（ソフトウェアのパスキー）→ クライアント登録 → 同意 → トークン → MCP 操作 → リフレッシュ → 接続の取り消しまでを通す。引数なしだと Node 版を一時 DB で起動して検査する。`BASE_URL=http://localhost:8787 pnpm e2e` で、起動済みの `wrangler dev` などを検査する（その `PUBLIC_URL` は同じ URL で、世帯が未作成であること）。
+- 確認済み: Node 版、`wrangler dev --local`（workerd + ローカル D1）の両方で `pnpm e2e` が通る。`nodejs_compat` は不要。実機の CPU 時間（10 ms 制限、WebAuthn 検証を含む）は未測定。
+
 ## データモデル
 
 世帯ごとに完全に分離する。全ての業務テーブルに `household_id` を持つ。ID は ULID（26 文字、時刻順に並ぶ）。時刻は Unix 秒の整数。

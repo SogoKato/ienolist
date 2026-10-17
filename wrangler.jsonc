@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "household-lists",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+  // Created on first deploy if no id is given. The schema is the SQL in drizzle/:
+  //   wrangler d1 migrations apply DB --local    (or --remote)
+  "d1_databases": [
+    { "binding": "DB", "database_name": "household-lists", "migrations_dir": "drizzle" }
+  ]
+  // Set PUBLIC_URL (and optionally APP_NAME, SETUP_TOKEN, OAUTH_CLIENTS) as vars or secrets;
+  // for local development put them in .dev.vars, e.g. PUBLIC_URL=http://localhost:8787
+}
