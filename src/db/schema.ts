@@ -100,6 +100,9 @@ export const challenges = sqliteTable(
     challenge: text("challenge").notNull(),
     purpose: text("purpose", { enum: CHALLENGE_PURPOSES }).notNull(),
     userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    // What a registration is for (JSON), kept server-side until the ceremony finishes:
+    // the first admin's household, or the invite being redeemed.
+    data: text("data"),
     expiresAt: integer("expires_at").notNull(),
   },
   (t) => [check("challenges_purpose", sql`${t.purpose} IN (${quoted(CHALLENGE_PURPOSES)})`)],

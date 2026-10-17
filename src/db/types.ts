@@ -8,3 +8,7 @@ import type * as schema from "./schema.ts";
 export type Db = BaseSQLiteDatabase<"async", unknown, typeof schema> & {
   batch(queries: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]): Promise<unknown>;
 };
+
+// All of these statements are written, or none are.
+export const atomically = (db: Db, statements: BatchItem<"sqlite">[]) =>
+  db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import type { Db } from "../db/types.ts";
+import { atomically, type Db } from "../db/types.ts";
 import {
   FRIDGE_STATUSES,
   LISTS,
@@ -95,7 +95,7 @@ export function createItemService(db: Db, deps: Deps = {}) {
     });
 
   // The item change and its events are written in one atomic batch.
-  const write = (statements: BatchItem<"sqlite">[]) => db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  const write = (statements: BatchItem<"sqlite">[]) => atomically(db, statements);
 
   return {
     async list(actor: Actor, filter: { list?: string; status?: string } = {}): Promise<Item[]> {
