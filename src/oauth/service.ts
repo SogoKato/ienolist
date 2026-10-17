@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, isNotNull, isNull, lt, notExists, or, sql } from "drizzle-orm";
 import { oauthClients, oauthCodes, oauthTokens } from "../db/schema.ts";
-import type { Db } from "../db/types.ts";
+import { atomically, type Db } from "../db/types.ts";
 import type { Principal } from "../auth/service.ts";
 import { ulid } from "../lib/ulid.ts";
 import { randomToken, safeEqual, sha256 } from "../lib/token.ts";
@@ -107,13 +107,15 @@ export function createOAuthService(db: Db, config: OAuthConfig) {
     return row ? { clientId, name: row.name, redirectUris: JSON.parse(row.redirectUris) as string[] } : null;
   }
 
-  // Forgets tokens that can no longer be used, and clients that never got a token.
-  async function sweep() {
+  // The statements that forget tokens that can no longer be used, and clients that never got a token.
+  const sweepStatements = () => {
     const t = now();
-    await db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, t));
-    await db.delete(oauthTokens).where(or(lt(oauthTokens.refreshExpiresAt, t), isNotNull(oauthTokens.revokedAt)));
-    await db.delete(oauthClients).where(and(lt(oauthClients.createdAt, t - UNUSED_CLIENT_TTL), unused()));
-  }
+    return [
+      db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, t)),
+      db.delete(oauthTokens).where(or(lt(oauthTokens.refreshExpiresAt, t), isNotNull(oauthTokens.revokedAt))),
+      db.delete(oauthClients).where(and(lt(oauthClients.createdAt, t - UNUSED_CLIENT_TTL), unused())),
+    ];
+  };
 
   const unused = () =>
     and(
@@ -224,7 +226,7 @@ export function createOAuthService(db: Db, config: OAuthConfig) {
       }
       const name = (typeof input.client_name === "string" ? input.client_name.trim() : "").slice(0, NAME_LIMIT) || "MCP client";
 
-      await sweep();
+      await atomically(db, sweepStatements());
       const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(oauthClients);
       if (n >= MAX_CLIENTS) {
         // Full: make room by dropping the oldest client that never got a token, if there is one.
@@ -290,18 +292,20 @@ export function createOAuthService(db: Db, config: OAuthConfig) {
     // The signed-in person said yes: the URL to send the client back to, carrying a one-time code.
     async approve(principal: Principal, request: AuthorizationRequest): Promise<string> {
       const code = randomToken();
-      await sweep();
-      await db.insert(oauthCodes).values({
-        codeHash: await sha256(code),
-        clientId: request.clientId,
-        redirectUri: request.redirectUri,
-        codeChallenge: request.codeChallenge,
-        scope: request.scope,
-        resource: request.resource,
-        userId: principal.userId,
-        householdId: principal.householdId,
-        expiresAt: now() + CODE_TTL,
-      });
+      await atomically(db, [
+        ...sweepStatements(),
+        db.insert(oauthCodes).values({
+          codeHash: await sha256(code),
+          clientId: request.clientId,
+          redirectUri: request.redirectUri,
+          codeChallenge: request.codeChallenge,
+          scope: request.scope,
+          resource: request.resource,
+          userId: principal.userId,
+          householdId: principal.householdId,
+          expiresAt: now() + CODE_TTL,
+        }),
+      ]);
       return sendBack(request, { code });
     },
 

@@ -13,7 +13,7 @@ const actorOf = (p: Principal): Actor => ({ householdId: p.householdId, userId: 
 export function itemRoutes(auth: AuthService, items: ItemService, cookie: SessionCookie) {
   const app = new Hono<AppEnv>();
   const user = requireUser(auth, cookie);
-  app.use("/items", user);
+  // "/items/*" also matches "/items"; mounting both would look the session up twice.
   app.use("/items/*", user);
   app.use("/events", user);
 

@@ -60,7 +60,6 @@ export function oauthWebRoutes(auth: AuthService, oauth: OAuthService, cookie: S
   const app = new Hono<AppEnv>();
   const user = requireUser(auth, cookie);
   app.use("/oauth/*", user);
-  app.use("/connections", user);
   app.use("/connections/*", user);
 
   const unusable = (result: Extract<Authorization, { kind: "fatal" }>) => new HttpError(400, result.message);

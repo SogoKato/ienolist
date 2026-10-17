@@ -137,15 +137,17 @@ export function createAuthService(db: Db, config: AuthConfig) {
     return { token, statement };
   }
 
+  const principalColumns = {
+    userId: users.id,
+    displayName: users.displayName,
+    householdId: memberships.householdId,
+    householdName: households.name,
+    role: memberships.role,
+  };
+
   async function principalFor(userId: string): Promise<Principal | null> {
     const [row] = await db
-      .select({
-        userId: users.id,
-        displayName: users.displayName,
-        householdId: memberships.householdId,
-        householdName: households.name,
-        role: memberships.role,
-      })
+      .select(principalColumns)
       .from(users)
       .innerJoin(memberships, eq(memberships.userId, users.id))
       .innerJoin(households, eq(households.id, memberships.householdId))
@@ -354,14 +356,19 @@ export function createAuthService(db: Db, config: AuthConfig) {
       return { sessionToken: session.token, principal };
     },
 
+    // One query: the session and the person it belongs to.
     async authenticate(sessionToken: string | null | undefined): Promise<Principal | null> {
       if (!sessionToken) return null;
-      const [session] = await db
-        .select()
+      const [row] = await db
+        .select(principalColumns)
         .from(sessions)
+        .innerJoin(users, eq(users.id, sessions.userId))
+        .innerJoin(memberships, eq(memberships.userId, users.id))
+        .innerJoin(households, eq(households.id, memberships.householdId))
         .where(and(eq(sessions.tokenHash, await sha256(sessionToken)), gt(sessions.expiresAt, now())))
+        .orderBy(asc(memberships.createdAt), asc(memberships.householdId))
         .limit(1);
-      return session ? principalFor(session.userId) : null;
+      return row ?? null;
     },
 
     async logout(sessionToken: string) {
