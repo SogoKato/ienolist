@@ -1,5 +1,6 @@
 import type { Actor, ItemService } from "../items/service.ts";
 import { createMcpHandler } from "./protocol.ts";
+import { TOOLS_JSON } from "./tools.generated.ts";
 import { tools, userFacingError } from "./tools.ts";
 
 export type McpPrincipal = { actor: Actor; scopes: string[] };
@@ -12,7 +13,7 @@ export type McpDeps = {
   items: ItemService;
 };
 
-const handle = createMcpHandler({ serverInfo: { name: "household-lists", version: "0.0.0" }, tools, userFacingError });
+const handle = createMcpHandler({ serverInfo: { name: "household-lists", version: "0.0.0" }, tools, toolsJson: TOOLS_JSON, userFacingError });
 
 export async function handleMcpRequest(request: Request, deps: McpDeps): Promise<Response> {
   const principal = await deps.authenticate(request);

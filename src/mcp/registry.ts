@@ -26,7 +26,7 @@ export function formatIssues(error: z.core.$ZodError): string {
   return error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
 }
 
-// tools/list is identical for every request, so serialize it once per isolate.
+// The tools/list entries as JSON. Called at build time (scripts/gen-tools.ts).
 export function serializeTools(tools: ToolDef<never>[]): string {
   return JSON.stringify(
     tools.map((t) => ({

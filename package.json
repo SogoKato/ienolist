@@ -8,6 +8,7 @@
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
+    "gen": "node scripts/gen-tools.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\""
   },

@@ -1,4 +1,4 @@
-import { formatIssues, serializeTools, type ToolDef } from "./registry.ts";
+import { formatIssues, type ToolDef } from "./registry.ts";
 
 // Dual-era Streamable HTTP MCP server (stateless, POST only).
 //  - modern (2026-07-28): no handshake; every request carries _meta + mirrored headers
@@ -37,13 +37,14 @@ function decodeHeader(value: string | null): string | null {
 export type McpServerOptions<Ctx> = {
   serverInfo: { name: string; version: string };
   tools: ToolDef<Ctx>[];
+  // The tools/list entries, serialized at build time (scripts/gen-tools.ts).
+  toolsJson: string;
   // Anything thrown by a tool that is not a deliberate, user-facing error ends up here.
   userFacingError: (error: unknown) => string | null;
 };
 
-export function createMcpHandler<Ctx>({ serverInfo, tools, userFacingError }: McpServerOptions<Ctx>) {
+export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacingError }: McpServerOptions<Ctx>) {
   const byName = new Map(tools.map((t) => [t.name, t]));
-  let toolsJson: string | undefined;
 
   async function callTool(ctx: Ctx, scopes: readonly string[], params: any) {
     const tool = typeof params?.name === "string" ? byName.get(params.name) : undefined;
@@ -120,7 +121,6 @@ export function createMcpHandler<Ctx>({ serverInfo, tools, userFacingError }: Mc
         }));
       case "tools/list": {
         // The set may depend on the caller's authorization, so it is not public-cacheable.
-        toolsJson ??= serializeTools(tools as ToolDef<never>[]);
         const extra = modern ? ',"ttlMs":60000,"cacheScope":"private"' : "";
         const type = modern ? '"resultType":"complete",' : "";
         return new Response(

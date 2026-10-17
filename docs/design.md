@@ -110,7 +110,7 @@
 | `move_item` | 別のリストへ移動 | `items:write` |
 | `list_events` | 変更履歴の取得 | `items:read` |
 
-`tools/list` は、アイソレートごとに 1 回だけ組み立ててキャッシュする（7 ツールなら、ビルド時の生成は要らない）。説明文には、状態名の意味と「状態の変更は移動しない」ことを書く。読み取り専用のツールには `readOnlyHint` を付け、削除には `destructiveHint` を付ける。
+`tools/list` の中身は、ビルド時に JSON へ直列化しておく（`pnpm gen` で `src/mcp/tools.generated.ts` を作り直す。ツールを変えて生成し忘れると、テストが失敗する）。実行時に zod のスキーマを変換すると、アイソレートの最初の 1 回に 3〜10 ms の CPU がかかり、Workers Free の 10 ms の大半を使うため。説明文には、状態名の意味と「状態の変更は移動しない」ことを書く。読み取り専用のツールには `readOnlyHint` を付け、削除には `destructiveHint` を付ける。
 
 ## 未決事項
 
