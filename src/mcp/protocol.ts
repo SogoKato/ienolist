@@ -112,7 +112,7 @@ export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacing
         });
       }
       case "ping":
-        return ok(id, {});
+        return ok(id, withType({}));
       case "server/discover":
         return ok(id, withType({
           supportedVersions: [...MODERN, ...LEGACY],

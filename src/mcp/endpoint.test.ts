@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import type { DatabaseSync } from "node:sqlite";
 import { beforeEach, test } from "node:test";
 import { createTestDb } from "../db/testing.ts";
 import { createItemService, type Actor, type ItemService } from "../items/service.ts";
@@ -13,14 +14,16 @@ declare global {
 
 const claude: Actor = { householdId: "h1", userId: "u1", source: "mcp", clientId: "c1" };
 const ALL = ["items:read", "items:write"];
+let raw: DatabaseSync;
 let items: ItemService;
 let deps: McpDeps;
 let principal: { actor: Actor; scopes: string[] } | null;
 
 beforeEach(() => {
   const t = createTestDb();
-  t.raw.exec("INSERT INTO households (id, name, created_at) VALUES ('h1', 'Home', 0), ('h2', 'Other', 0)");
-  t.raw.exec("INSERT INTO users (id, display_name, created_at) VALUES ('u1', 'A', 0), ('u2', 'B', 0)");
+  raw = t.raw;
+  raw.exec("INSERT INTO households (id, name, created_at) VALUES ('h1', 'Home', 0), ('h2', 'Other', 0)");
+  raw.exec("INSERT INTO users (id, display_name, created_at) VALUES ('u1', 'A', 0), ('u2', 'B', 0)");
   items = createItemService(t.db);
   principal = { actor: claude, scopes: ALL };
   deps = { authenticate: async () => principal, resourceMetadataUrl: () => "https://app.test/.well-known/oauth-protected-resource/mcp", items };
@@ -157,17 +160,17 @@ test("tool errors are reported as tool results the model can act on", async () =
 test("unknown tools are protocol errors; unexpected failures stay generic", async () => {
   const res = await (await modern("tools/call", { name: "drop_tables", arguments: {} }, "drop_tables")).json();
   assert.equal(res.error.code, -32602);
-  const broken: McpDeps = { ...deps, items: { ...items, list: async () => { throw new Error("SQLITE_CORRUPT: secret detail"); } } };
+  // A real database failure: the table is gone, so SQLite's own error is thrown, not an ItemError.
+  raw.exec("DROP TABLE items");
+  const logged: unknown[][] = [];
   const quiet = console.error;
-  console.error = () => {};
+  console.error = (...args: unknown[]) => void logged.push(args);
   try {
-    const r = await (await handleMcpRequest(new Request("https://app.test/mcp", {
-      method: "POST",
-      headers: { "content-type": "application/json", "mcp-protocol-version": V, "mcp-method": "tools/call", "mcp-name": "list_items" },
-      body: JSON.stringify(rpc(1, "tools/call", { name: "list_items", arguments: {}, ...meta })),
-    }), broken)).json();
-    assert.deepEqual(r.result.content, [{ type: "text", text: "Internal error" }]);
-    assert.equal(r.result.isError, true);
+    const r = await modernCall("list_items");
+    assert.deepEqual(r.content, [{ type: "text", text: "Internal error" }]);
+    assert.equal(r.isError, true);
+    assert.doesNotMatch(JSON.stringify(r), /no such table/);
+    assert.equal(logged.length, 1);
   } finally {
     console.error = quiet;
   }
@@ -194,4 +197,72 @@ test("a household's tokens only reach its own items", async () => {
   assert.equal((await modernCall("get_item", { id: mine.id })).content[0].text, "Item not found");
   assert.equal((await modernCall("delete_item", { id: mine.id })).isError, true);
   assert.deepEqual(data(await modernCall("list_events")).events, []);
+});
+
+test("only POST reaches the tools", async () => {
+  for (const method of ["PUT", "DELETE", "PATCH"]) {
+    const res = await handleMcpRequest(new Request("https://app.test/mcp", { method }), deps);
+    assert.equal(res.status, 405, method);
+  }
+});
+
+test("authentication is checked before the body is read", async () => {
+  principal = null;
+  const res = await handleMcpRequest(new Request("https://app.test/mcp", { method: "POST", body: "{" }), deps);
+  assert.equal(res.status, 401);
+});
+
+test("input limits are enforced on the way in", async () => {
+  const err = async (name: string, args: object) => {
+    const r = await modernCall(name, args);
+    assert.equal(r.isError, true, `${name} ${JSON.stringify(args).slice(0, 60)}`);
+    return r.content[0].text;
+  };
+  assert.match(await err("create_item", { list: "fridge", name: "" }), /^Invalid arguments: name/);
+  assert.match(await err("create_item", { list: "fridge", name: "x".repeat(501) }), /^Invalid arguments: name/);
+  assert.match(await err("create_item", { list: "fridge", name: "x", note: "n".repeat(2001) }), /^Invalid arguments: note/);
+  assert.match(await err("get_item", { id: "x".repeat(65) }), /^Invalid arguments: id/);
+  assert.match(await err("get_item", { id: "" }), /^Invalid arguments: id/);
+  assert.match(await err("list_events", { limit: 501 }), /^Invalid arguments: limit/);
+  assert.match(await err("list_events", { limit: 1.5 }), /^Invalid arguments: limit/);
+  assert.match(await err("move_item", { id: "x", to: "pantry" }), /^Invalid arguments: to/);
+  // Whitespace passes the schema but not the service, which trims first.
+  assert.match(await err("create_item", { list: "fridge", name: "   " }), /^name must be 1-500 characters$/);
+  const egg = data(await modernCall("create_item", { list: "fridge", name: "egg" }));
+  assert.match(await err("update_item", { id: egg.id, name: "   " }), /^name must be/);
+});
+
+test("list_items filters by list and status, and rejects a status of the other list", async () => {
+  await modernCall("create_item", { list: "shopping", name: "milk" });
+  const bread = data(await modernCall("create_item", { list: "shopping", name: "bread" }));
+  await modernCall("update_item", { id: bread.id, status: "bought" });
+  await modernCall("create_item", { list: "fridge", name: "egg" });
+  const names = async (args: object) => data(await modernCall("list_items", args)).items.map((i: { name: string }) => i.name);
+  assert.deepEqual(await names({}), ["milk", "bread", "egg"]);
+  assert.deepEqual(await names({ list: "shopping", status: "bought" }), ["bread"]);
+  assert.deepEqual(await names({ status: "in_stock" }), ["egg"]);
+  const bad = await modernCall("list_items", { list: "fridge", status: "bought" });
+  assert.equal(bad.isError, true);
+  assert.match(bad.content[0].text, /status for the fridge list must be one of: in_stock, used_up/);
+});
+
+test("items added in quick succession come back in the order they were added", async () => {
+  const names = Array.from({ length: 20 }, (_, i) => `item ${i}`);
+  for (const name of names) await modernCall("create_item", { list: "shopping", name });
+  assert.deepEqual(data(await modernCall("list_items")).items.map((i: { name: string }) => i.name), names);
+});
+
+test("japanese names and notes survive the round trip", async () => {
+  const created = data(await modernCall("create_item", { list: "fridge", name: "牛乳", note: "特売 🥛 2本" }));
+  const fetched = data(await modernCall("get_item", { id: created.id }));
+  assert.deepEqual([fetched.name, fetched.note], ["牛乳", "特売 🥛 2本"]);
+  assert.equal(data(await modernCall("list_events")).events[0].name, "牛乳");
+});
+
+test("the history records which client made each change", async () => {
+  const created = data(await modernCall("create_item", { list: "fridge", name: "egg" }));
+  principal = { actor: { ...claude, clientId: "other-client" }, scopes: ALL };
+  await modernCall("update_item", { id: created.id, status: "used_up" });
+  const clients = raw.prepare("SELECT client_id AS c FROM item_events ORDER BY id").all().map((r) => r.c);
+  assert.deepEqual(clients, ["c1", "other-client"]);
 });
