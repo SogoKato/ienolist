@@ -76,12 +76,24 @@
 - ローカルの Workers: `.dev.vars` に `PUBLIC_URL=http://localhost:8787` → `wrangler d1 migrations apply DB --local` → `pnpm dev`。
 - `pnpm e2e`: 実際の HTTP で、セットアップ（ソフトウェアのパスキー）→ クライアント登録 → 同意 → トークン → MCP 操作 → リフレッシュ → 接続の取り消しまでを通す。引数なしだと Node 版を一時 DB で起動して検査する。`BASE_URL=http://localhost:8787 pnpm e2e` で、起動済みの `wrangler dev` などを検査する（その `PUBLIC_URL` は同じ URL で、世帯が未作成であること）。
 - 確認済み: Node 版、`wrangler dev --local`（workerd + ローカル D1）、実際の Cloudflare（workers.dev、D1）の 3 つで `pnpm e2e` が通る。`nodejs_compat` は不要。Worker の起動時間は 19 ms。
-- 実機の CPU 時間（2026-10-17、`wrangler tail` の `cpuTime`、e2e を 1 回通した時の 17 件。tail が取りこぼした分がある）:
-  - 軽い要求（MCP、メタデータ、トークン、接続一覧、削除）: 1〜5 ms。
-  - パスキー登録と認証の検証（`/api/setup/finish`、`/api/login/finish`）: 14〜15 ms。
-  - 同意（`/api/oauth/authorize`）: 15 ms、`/oauth/register`: 9 ms。
-  - コールドスタート直後の最初の要求（`/api/setup/options`）: 27 ms。`/api/logout` が 46 ms だったが理由は不明（分離環境の入れ替わりの可能性）。
-  - 全て `outcome: ok` で、CPU 超過は出ていない。Free プランの 10 ms 制限が厳密に適用されるのか、このアカウントのプランは何か、は未確認。繰り返し測定（暖まった状態の分布）も未実施。
+- 実機の CPU 時間（2026-10-17、Free プラン、`wrangler tail` の `cpuTime`、`scripts/measure.ts` で 20 ラウンドを間隔 0.4 秒で実行した 173 件）。単位は ms:
+
+  | 要求 | p50 | p90 | 最大 | 10 超 |
+  |---|---|---|---|---|
+  | `POST /mcp`（tools/call） | 4 | 6 | 10 | 0/18 |
+  | `POST /oauth/token` | 4 | 5 | 9 | 0/38 |
+  | `POST /oauth/register` | 7 | 10 | 12 | 1/20 |
+  | `POST /api/logout` | 5 | 8 | 13 | 1/20 |
+  | `POST /api/login/options` | 3 | 6 | 10 | 0/15 |
+  | `POST /api/login/finish`（パスキー検証） | 9 | 11 | 20 | 3/20 |
+  | `POST /api/oauth/authorize`（同意） | 11 | 15 | 15 | 13/20 |
+  | `GET /api/items`（セッション認証 + 一覧） | 10 | 14 | 15 | 9/20 |
+  | `POST /api/setup/finish`（登録検証、1 回） | 15 | | | |
+  | `POST /api/setup/options`（コールドスタート直後、1 回） | 43 | | | |
+
+  - 173 件中 28 件が 10 ms を超えたが、全て `outcome: ok` で、CPU 超過のエラーは出なかった。Free プランの 10 ms は、この範囲では打ち切りに使われていない（保証はない。設計は余裕のある側に倒しておく）。
+  - 意外な点: 単純な `GET /api/items`（セッション認証と一覧）が p50 10 ms で、MCP の `tools/call`（4 ms）より重い。認証の問い合わせ（セッション → 世帯・利用者の結合）に原因がありそう。最適化の候補（未調査）。
+  - 同意（`/api/oauth/authorize`）はセッション認証 + クライアント参照 + コード発行で、同じ理由で重い。
 
 ## データモデル
 
