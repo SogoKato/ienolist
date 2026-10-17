@@ -69,6 +69,8 @@ export function authRoutes(auth: AuthService, cookie: SessionCookie) {
     return c.json({ path: `/join/${token}`, expiresAt }, 201);
   });
 
+  app.get("/members", user, async (c) => c.json({ members: await auth.listMembers(c.get("principal")) }));
+
   app.get("/passkeys", user, async (c) => c.json({ passkeys: await auth.listPasskeys(c.get("principal")) }));
 
   app.post("/passkeys/options", user, async (c) => c.json(await auth.beginAddPasskey(c.get("principal"))));

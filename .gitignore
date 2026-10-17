@@ -9,3 +9,7 @@ node_modules/
 .wrangler/
 .DS_Store
 data/
+.e2e-data/
+test-results/
+playwright-report/
+dist/

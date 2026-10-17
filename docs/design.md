@@ -68,6 +68,17 @@
 - CORS: メタデータ、`/oauth/register`、`/oauth/token`、`/oauth/revoke`、`/mcp` は任意のオリジンから呼べる（Cookie を使わないため）。`/oauth/authorize` と `/api` は同一オリジンのみ。
 - 事前登録のクライアントは `createOAuthService` の `clients` で渡す（使われた時に DB へ反映される）。環境変数からの読み込みは、エントリポイントを作る時に足す。
 
+### Web UI（PWA）
+
+- `web/`: Vite + React + wouter。ビルドは `pnpm build`（出力は `dist/web`）。開発は `pnpm start`（API。`PUBLIC_URL=http://localhost:5173`）と `pnpm dev:web`（`:5173`、API へプロキシ）。パスキーはブラウザから見えるオリジンに結びつくため、この組み合わせにする。
+- 画面: セットアップ（`/setup`）、招待・再登録（`/join/:token`）、ログイン（`/login`）、リスト（`/`）、設定（`/settings`）、接続の同意（`/authorize`）。未ログインで開くと `/login?next=…` へ送り、ログイン後に戻す（`next` は同一サイトのパスのみ）。
+- リスト: 買い物と冷蔵庫のタブ。チェックは状態の切り替えだけで、リスト間は動かさない（動かすのは、項目のメニューか「まとめて…へ移す」）。チェックは即座に反映し、失敗したら再読み込みで戻す。20 秒ごと、および画面に戻った時に再読み込みして、他の端末やアシスタントの変更を反映する。
+- 設定: 接続中のアシスタントの一覧と解除、自分のパスキーの追加・削除、家族の一覧、招待リンクの作成（管理者）、メンバーのパスキー再登録リンク（管理者）、ログアウト。
+- 同意画面: クライアント名、戻り先のホスト、許可する内容を表示する。名前は自己申告であることも書く。
+- PWA: マニフェスト、アイコン（`scripts/make-icons.ts` で生成）、Service Worker（アプリ本体のみキャッシュ。`/api`、`/oauth`、`/mcp` は常にネットワーク）。リストのオフライン閲覧と書き込みは未対応。
+- 静的ファイルの配信: Node 版は `src/http/static.ts`（SPA のフォールバックつき。`WEB_DIR` で場所を変更）。Workers 版は静的アセット（`not_found_handling: single-page-application`、API は `run_worker_first`）。どちらも CSP などのヘッダーを付ける（Workers 版は `web/public/_headers`）。
+- 文言は日本語のみで、コンポーネントに直接書いてある。多言語化は未対応（OSS 公開時の言語の方針は未決）。
+
 ### 実行とデプロイ
 
 - エントリポイントは 2 つ。`src/worker.ts`（Cloudflare Workers + D1）と `src/node.ts`（Node + SQLite ファイル。`pnpm start`）。どちらも `src/main.ts` の `buildApp(db, env)` でサービスをつなぐ。
@@ -164,7 +175,9 @@
 - 層ごとの役割:
   - 単体: 純粋なロジック（ハッシュ、PKCE、`redirect_uri` の照合、スコープの絞り込み）。
   - 結合: Hono のアプリを `app.request()` で呼び、実際の SQLite をつなぐ。OAuth の流れ、世帯の分離、最初の管理者の競合を確認する。
-  - E2E: MCP の流れ（DCR から `tools/call` まで）をスクリプトで HTTP 越しに通す。PWA は Playwright と Chrome の仮想認証器でパスキーを通す。実際の claude.ai との接続確認は手で行う。
+  - E2E（HTTP）: `pnpm e2e`。MCP の流れ（DCR から `tools/call` まで）を HTTP 越しに通す。
+  - E2E（ブラウザ）: `pnpm test:browser`。Playwright と Chrome の仮想認証器で、セットアップ、リスト操作、ログアウトと再ログイン、招待、アシスタントの接続（同意、トークン、MCP、解除）、インストール要素を本物のブラウザで通す。ビルド済みのアプリと Node 版を、使い捨ての DB で起動する。
+  - 実際の claude.ai との接続確認は手で行う。
 - D1 固有の挙動（`batch`、外部キー、CPU 10 ms）は、D1 向けの `wrangler dev` と実機の計測で確認する。
 
 ## 未決事項

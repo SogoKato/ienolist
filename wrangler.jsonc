@@ -4,6 +4,13 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-09-01",
   "observability": { "enabled": true },
+  // The web app (pnpm build) is served as static assets; everything the server answers itself goes to the Worker.
+  "build": { "command": "pnpm build" },
+  "assets": {
+    "directory": "dist/web",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/oauth/*", "/mcp", "/mcp/*", "/.well-known/*"]
+  },
   // Created on first deploy if no id is given. The schema is the SQL in drizzle/:
   //   wrangler d1 migrations apply DB --local    (or --remote)
   "d1_databases": [

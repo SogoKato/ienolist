@@ -243,6 +243,19 @@ test("an admin invites a member, who joins and shares the household's lists", as
   assert.equal((await ben.post("/api/invites")).status, 403);
 });
 
+test("everyone in the household can see who is in it, and nobody else can", async () => {
+  const { browser: admin, me } = await setUp();
+  const { browser: ben, res } = await join(await invite(admin), "Ben");
+  const benId = (await res.json()).user.id;
+  const expected = [
+    { id: me.user.id, displayName: "Aki", role: "admin" },
+    { id: benId, displayName: "Ben", role: "member" },
+  ];
+  assert.deepEqual((await (await admin.get("/api/members")).json()).members, expected);
+  assert.deepEqual((await (await ben.get("/api/members")).json()).members, expected);
+  assert.equal((await new Browser().get("/api/members")).status, 401);
+});
+
 test("members cannot reach the admin-only calls", async () => {
   const { browser: admin, me } = await setUp();
   const { browser: ben } = await join(await invite(admin), "Ben");

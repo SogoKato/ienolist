@@ -1,0 +1,234 @@
+import { createHash, randomBytes } from "node:crypto";
+import { expect, test, type Browser, type Page } from "@playwright/test";
+
+// One household's story, in order, in a real browser: the first person sets up, uses the lists,
+// signs out and in with the passkey, invites a family member, and connects an assistant.
+test.describe.configure({ mode: "serial" });
+
+// A browser profile with a software passkey in it (Chrome's virtual authenticator).
+async function person(browser: Browser) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  page.on("dialog", (dialog) => dialog.accept());
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  return { context, page };
+}
+
+let aki: Page;
+let ben: Page;
+let inviteUrl = "";
+
+const addItem = async (page: Page, placeholder: string, name: string) => {
+  await page.getByLabel(placeholder).fill(name);
+  await page.getByRole("button", { name: "追加", exact: true }).click();
+};
+const openMenu = async (page: Page, name: string, action: string) => {
+  await page.getByLabel(`${name} のメニュー`).click();
+  await page.getByRole("button", { name: action, exact: true }).click();
+};
+
+test("the first visitor is sent to set the app up, and ends up signed in with a passkey", async ({ browser }) => {
+  ({ page: aki } = await person(browser));
+  await aki.goto("/");
+  await expect(aki).toHaveURL(/\/setup$/);
+  await aki.getByLabel("あなたの名前").fill("Aki");
+  await aki.getByLabel("家の名前").fill("我が家");
+  await aki.getByRole("button", { name: "パスキーを作って始める" }).click();
+  await expect(aki.getByRole("heading", { name: "家のリスト" })).toBeVisible();
+  await expect(aki).toHaveURL(/\/$/);
+});
+
+test("items can be added, ticked off and moved to the fridge, and they stay after a reload", async () => {
+  await addItem(aki, "買うものを追加", "牛乳");
+  await addItem(aki, "買うものを追加", "卵");
+  await expect(aki.getByText("牛乳")).toBeVisible();
+  await aki.getByLabel("牛乳 を買った").check();
+  await expect(aki.getByRole("region", { name: "買った" }).getByText("牛乳")).toBeVisible();
+
+  await aki.reload();
+  await expect(aki.getByRole("region", { name: "買った" }).getByText("牛乳")).toBeVisible();
+  await expect(aki.getByLabel("卵 を買った")).not.toBeChecked();
+
+  await aki.getByRole("button", { name: "まとめて冷蔵庫へ移す" }).click();
+  await expect(aki.getByRole("region", { name: "買った" })).toHaveCount(0);
+  await aki.getByRole("tab", { name: /冷蔵庫/ }).click();
+  await expect(aki.getByText("牛乳")).toBeVisible();
+  await expect(aki.getByText("卵")).toHaveCount(0);
+});
+
+test("an item can be edited, moved back and deleted from its menu", async () => {
+  await addItem(aki, "冷蔵庫にあるものを追加", "ヨーグルト");
+  await openMenu(aki, "ヨーグルト", "編集");
+  await aki.getByLabel("メモ").fill("プレーン");
+  await aki.getByRole("button", { name: "保存" }).click();
+  await expect(aki.getByText("プレーン")).toBeVisible();
+
+  await aki.getByLabel("ヨーグルト を使い切った").check();
+  await expect(aki.getByRole("region", { name: "使い切った" }).getByText("ヨーグルト")).toBeVisible();
+  await openMenu(aki, "ヨーグルト", "買い物リストへ移す");
+  await expect(aki.getByText("ヨーグルト")).toHaveCount(0);
+  await aki.getByRole("tab", { name: /買い物/ }).click();
+  await expect(aki.getByText("ヨーグルト")).toBeVisible();
+
+  await openMenu(aki, "ヨーグルト", "削除");
+  await expect(aki.getByText("ヨーグルト")).toHaveCount(0);
+});
+
+test("signing out and back in with the passkey brings the lists back", async () => {
+  await aki.getByRole("link", { name: "設定" }).click();
+  await expect(aki.getByRole("heading", { name: "パスキー" })).toBeVisible();
+  await aki.getByRole("button", { name: "ログアウト" }).click();
+  await expect(aki).toHaveURL(/\/login$/);
+
+  // A page that needs sign-in sends people to the login, and back afterwards.
+  await aki.goto("/settings");
+  await expect(aki).toHaveURL(/\/login\?next=%2Fsettings$/);
+  await aki.getByRole("button", { name: "パスキーでログイン" }).click();
+  await expect(aki).toHaveURL(/\/settings$/);
+  await aki.getByRole("link", { name: "リストへ" }).click();
+  await aki.getByRole("tab", { name: /冷蔵庫/ }).click();
+  await expect(aki.getByText("牛乳")).toBeVisible();
+});
+
+test("an invited family member joins on their own device and sees the same lists", async ({ browser }) => {
+  await aki.getByRole("link", { name: "設定" }).click();
+  await aki.getByRole("button", { name: "家族を招待するリンクを作る" }).click();
+  inviteUrl = await aki.getByLabel("リンク").inputValue();
+  expect(inviteUrl).toMatch(/\/join\/[A-Za-z0-9_-]+$/);
+
+  ({ page: ben } = await person(browser));
+  await ben.goto(inviteUrl);
+  await expect(ben.getByRole("heading", { name: "我が家 に参加" })).toBeVisible();
+  await ben.getByLabel("あなたの名前").fill("Ben");
+  await ben.getByRole("button", { name: "パスキーを作る" }).click();
+  await expect(ben.getByRole("heading", { name: "家のリスト" })).toBeVisible();
+  await ben.getByRole("tab", { name: /冷蔵庫/ }).click();
+  await expect(ben.getByText("牛乳")).toBeVisible();
+
+  // The link works once.
+  await ben.goto(inviteUrl);
+  await expect(ben.getByRole("heading", { name: "招待リンクが無効です" })).toBeVisible();
+
+  await aki.reload();
+  await expect(aki.getByText("Ben")).toBeVisible();
+  await expect(aki.getByRole("button", { name: "パスキー再登録のリンク" })).toHaveCount(1);
+});
+
+test("a change made on one device is there on the other", async () => {
+  await ben.goto("/");
+  await ben.getByRole("tab", { name: /買い物/ }).click();
+  await addItem(ben, "買うものを追加", "パン");
+  await aki.getByRole("link", { name: "リストへ" }).click();
+  await aki.reload();
+  await expect(aki.getByText("パン")).toBeVisible();
+});
+
+test.describe("connecting an assistant", () => {
+  const redirect = "https://claude.ai/api/mcp/auth_callback";
+  let clientId = "";
+  let accessToken = "";
+
+  async function authorizeUrl(page: Page, state: string) {
+    const registered = await page.request.post("/oauth/register", { data: { client_name: "E2E アシスタント", redirect_uris: [redirect] } });
+    clientId = (await registered.json()).client_id;
+    const verifier = randomBytes(32).toString("base64url");
+    const query = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: redirect,
+      code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+      code_challenge_method: "S256",
+      state,
+    });
+    return { verifier, url: `/oauth/authorize?${query}` };
+  }
+
+  test("a signed-out person signs in, sees who is asking and where they go back to, and allows", async () => {
+    // Claude's browser comes back to its own site; stand in for that site.
+    await aki.route("https://claude.ai/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "callback" }));
+    await aki.goto("/settings");
+    await aki.getByRole("button", { name: "ログアウト" }).click();
+    await expect(aki).toHaveURL(/\/login$/);
+
+    const { verifier, url } = await authorizeUrl(aki, "state-1");
+    await aki.goto(url);
+    await expect(aki).toHaveURL(/\/login\?next=%2Fauthorize/);
+    await aki.getByRole("button", { name: "パスキーでログイン" }).click();
+
+    await expect(aki.getByRole("heading", { name: "接続を許可しますか？" })).toBeVisible();
+    await expect(aki.getByText("E2E アシスタント")).toBeVisible();
+    await expect(aki.getByText("claude.ai")).toBeVisible();
+    await expect(aki.getByText("アイテムを追加・変更・削除・移動する")).toBeVisible();
+    await aki.getByRole("button", { name: "許可する" }).click();
+
+    await aki.waitForURL((url) => url.origin === "https://claude.ai");
+    const back = new URL(aki.url());
+    expect(back.searchParams.get("state")).toBe("state-1");
+    expect(back.searchParams.get("iss")).toBe("http://localhost:18787");
+
+    // The assistant trades the code for a token and uses the household's lists.
+    const token = await aki.request.post("/oauth/token", {
+      form: { grant_type: "authorization_code", code: back.searchParams.get("code")!, code_verifier: verifier, client_id: clientId, redirect_uri: redirect },
+    });
+    expect(token.status()).toBe(200);
+    const { access_token: access } = await token.json();
+    const V = "2026-07-28";
+    const call = await aki.request.post("/mcp", {
+      headers: { authorization: `Bearer ${access}`, "mcp-protocol-version": V, "mcp-method": "tools/call", "mcp-name": "list_items" },
+      data: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "list_items", arguments: {}, _meta: { "io.modelcontextprotocol/protocolVersion": V, "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "0" }, "io.modelcontextprotocol/clientCapabilities": {} } },
+      },
+    });
+    const items = JSON.parse((await call.json()).result.content[0].text).items.map((i: { name: string }) => i.name);
+    expect(items).toEqual(expect.arrayContaining(["牛乳", "卵", "パン"]));
+    accessToken = access;
+  });
+
+  test("the connection is listed in the settings, and disconnecting cuts it off", async () => {
+    await aki.goto("/settings");
+    await expect(aki.getByText("E2E アシスタント")).toBeVisible();
+    await expect(aki.getByText("閲覧と編集")).toBeVisible();
+    await aki.getByRole("button", { name: "解除" }).click();
+    await expect(aki.getByText("接続はありません。")).toBeVisible();
+
+    const V = "2026-07-28";
+    const call = await aki.request.post("/mcp", {
+      headers: { authorization: `Bearer ${accessToken}`, "mcp-protocol-version": V, "mcp-method": "tools/list" },
+      data: { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+    });
+    expect(call.status()).toBe(401);
+  });
+
+  test("saying no sends the assistant back with access_denied", async () => {
+    const { url } = await authorizeUrl(aki, "state-2");
+    await aki.goto(url);
+    await aki.getByRole("button", { name: "許可しない" }).click();
+    await aki.waitForURL((url) => url.origin === "https://claude.ai");
+    const back = new URL(aki.url());
+    expect(back.searchParams.get("error")).toBe("access_denied");
+    expect(back.searchParams.get("state")).toBe("state-2");
+    expect(back.searchParams.get("code")).toBeNull();
+  });
+
+  test("a request for an unknown client is refused with a message, not redirected", async () => {
+    await aki.goto(`/authorize?client_id=nobody&redirect_uri=${encodeURIComponent(redirect)}&response_type=code`);
+    await expect(aki.getByRole("heading", { name: "接続できません" })).toBeVisible();
+    await expect(aki.getByText("Unknown client.")).toBeVisible();
+  });
+});
+
+test("the app can be installed: manifest, icons and service worker are in place", async () => {
+  await aki.goto("/");
+  const manifest = await (await aki.request.get("/manifest.webmanifest")).json();
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/" });
+  for (const icon of manifest.icons) expect((await aki.request.get(icon.src)).status()).toBe(200);
+  const registered = await aki.evaluate(async () => (await navigator.serviceWorker.ready).active?.state);
+  expect(registered).toBe("activated");
+});

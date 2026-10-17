@@ -368,6 +368,18 @@ export function createAuthService(db: Db, config: AuthConfig) {
       await db.delete(sessions).where(eq(sessions.tokenHash, await sha256(sessionToken)));
     },
 
+    // --- the household's people -----------------------------------------------
+
+    async listMembers(actor: Principal) {
+      const rows = await db
+        .select({ id: users.id, displayName: users.displayName, role: memberships.role })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(eq(memberships.householdId, actor.householdId))
+        .orderBy(asc(memberships.createdAt), asc(users.id));
+      return rows;
+    },
+
     // --- a signed-in person's passkeys --------------------------------------
 
     async listPasskeys(actor: Principal) {
