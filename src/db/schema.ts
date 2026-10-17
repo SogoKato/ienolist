@@ -12,6 +12,9 @@ export const CHALLENGE_PURPOSES = ["register", "authenticate"] as const;
 export const EVENT_TYPES = ["created", "renamed", "status_changed", "note_changed", "moved", "deleted"] as const;
 export const EVENT_SOURCES = ["web", "mcp"] as const;
 
+export const NAME_MAX = 500;
+export const NOTE_MAX = 2000;
+
 const quoted = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(", "));
 
 // --- households and people -------------------------------------------------
@@ -162,7 +165,8 @@ export const items = sqliteTable(
   },
   (t) => [
     index("items_household_list_status").on(t.householdId, t.list, t.status),
-    check("items_name_length", sql`length(${t.name}) BETWEEN 1 AND 500`),
+    check("items_name_length", sql`length(${t.name}) BETWEEN 1 AND ${sql.raw(String(NAME_MAX))}`),
+    check("items_note_length", sql`${t.note} IS NULL OR length(${t.note}) <= ${sql.raw(String(NOTE_MAX))}`),
     check(
       "items_list_status",
       sql`(${t.list} = 'shopping' AND ${t.status} IN (${quoted(SHOPPING_STATUSES)})) OR (${t.list} = 'fridge' AND ${t.status} IN (${quoted(FRIDGE_STATUSES)}))`,

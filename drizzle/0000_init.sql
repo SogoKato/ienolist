@@ -67,6 +67,7 @@ CREATE TABLE `items` (
 	FOREIGN KEY (`household_id`) REFERENCES `households`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`added_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null,
 	CONSTRAINT "items_name_length" CHECK(length("items"."name") BETWEEN 1 AND 500),
+	CONSTRAINT "items_note_length" CHECK("items"."note" IS NULL OR length("items"."note") <= 2000),
 	CONSTRAINT "items_list_status" CHECK(("items"."list" = 'shopping' AND "items"."status" IN ('to_buy', 'bought')) OR ("items"."list" = 'fridge' AND "items"."status" IN ('in_stock', 'used_up')))
 );
 --> statement-breakpoint

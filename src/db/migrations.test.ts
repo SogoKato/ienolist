@@ -1,19 +1,12 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import { beforeEach, test } from "node:test";
+import { createTestDb } from "./testing.ts";
 
-// Applies the generated SQL migrations to an in-memory database, so the tests
-// exercise the constraints that actually ship.
-const dir = new URL("../../drizzle/", import.meta.url);
 let db: DatabaseSync;
 
 beforeEach(() => {
-  db = new DatabaseSync(":memory:");
-  db.exec("PRAGMA foreign_keys = ON");
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
-    for (const statement of readFileSync(new URL(file, dir), "utf8").split("--> statement-breakpoint")) db.exec(statement);
-  }
+  db = createTestDb().raw;
   db.exec("INSERT INTO households (id, name, created_at) VALUES ('h1', 'Home', 0), ('h2', 'Other', 0)");
   db.exec("INSERT INTO users (id, display_name, created_at) VALUES ('u1', 'A', 0)");
 });
@@ -34,6 +27,14 @@ test("items reject a status that belongs to the other list", () => {
   assert.throws(() => addItem("fridge", "bought"), /CHECK constraint failed: items_list_status/);
   assert.throws(() => addItem("pantry", "to_buy"), /CHECK constraint failed/);
   assert.throws(() => addItem("fridge", "checked"), /CHECK constraint failed/);
+});
+
+test("items need a note of at most 2000 characters", () => {
+  const insert = (note: string | null) =>
+    db.prepare("INSERT INTO items (id, household_id, list, status, name, note, created_at, updated_at) VALUES (?, 'h1', 'fridge', 'in_stock', 'milk', ?, 0, 0)").run(`n-${Math.random()}`, note);
+  insert(null);
+  insert("x".repeat(2000));
+  assert.throws(() => insert("x".repeat(2001)), /items_note_length/);
 });
 
 test("items need a name of 1-500 characters", () => {

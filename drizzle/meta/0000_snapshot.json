@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3c6e2fb9-6cc0-46a3-ba99-61ae25423749",
+  "id": "4d19adbc-56fe-4a5c-a057-fc752bf029ad",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "app_meta": {
@@ -488,6 +488,10 @@
         "items_name_length": {
           "name": "items_name_length",
           "value": "length(\"items\".\"name\") BETWEEN 1 AND 500"
+        },
+        "items_note_length": {
+          "name": "items_note_length",
+          "value": "\"items\".\"note\" IS NULL OR length(\"items\".\"note\") <= 2000"
         },
         "items_list_status": {
           "name": "items_list_status",
