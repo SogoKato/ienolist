@@ -29,7 +29,7 @@ import {
 export type Role = (typeof ROLES)[number];
 
 // Who is signed in, and for which household.
-export type Principal = { userId: string; displayName: string; householdId: string; role: Role };
+export type Principal = { userId: string; displayName: string; householdId: string; householdName: string; role: Role };
 
 export class AuthError extends Error {
   readonly code: "invalid" | "unauthorized" | "forbidden" | "conflict" | "not_found";
@@ -139,9 +139,16 @@ export function createAuthService(db: Db, config: AuthConfig) {
 
   async function principalFor(userId: string): Promise<Principal | null> {
     const [row] = await db
-      .select({ userId: users.id, displayName: users.displayName, householdId: memberships.householdId, role: memberships.role })
+      .select({
+        userId: users.id,
+        displayName: users.displayName,
+        householdId: memberships.householdId,
+        householdName: households.name,
+        role: memberships.role,
+      })
       .from(users)
       .innerJoin(memberships, eq(memberships.userId, users.id))
+      .innerJoin(households, eq(households.id, memberships.householdId))
       .where(eq(users.id, userId))
       .orderBy(asc(memberships.createdAt), asc(memberships.householdId))
       .limit(1);
@@ -207,7 +214,7 @@ export function createAuthService(db: Db, config: AuthConfig) {
         if (await isInitialized()) throw new AuthError("conflict", "Someone else finished setting this app up first");
         throw error;
       }
-      return { sessionToken: session.token, principal: { userId, displayName, householdId, role: "admin" as const } };
+      return { sessionToken: session.token, principal: { userId, displayName, householdId, householdName, role: "admin" as const } };
     },
 
     // --- invites and recovery -----------------------------------------------

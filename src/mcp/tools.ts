@@ -1,34 +1,13 @@
 import * as z from "zod/mini";
 import { FRIDGE_STATUSES, LISTS, NAME_MAX, NOTE_MAX, SHOPPING_STATUSES } from "../db/schema.ts";
-import { ItemError, type Actor, type Item, type ItemEvent, type ItemService } from "../items/service.ts";
+import { eventJson, itemJson } from "../items/json.ts";
+import { ItemError, type Actor, type ItemService } from "../items/service.ts";
 import { defineTool, type ToolDef, type ToolResult } from "./registry.ts";
 
 export type Ctx = { items: ItemService; actor: Actor };
 
 export const SCOPE_READ = "items:read";
 export const SCOPE_WRITE = "items:write";
-
-const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
-
-const itemJson = (i: Item) => ({
-  id: i.id,
-  list: i.list,
-  status: i.status,
-  name: i.name,
-  note: i.note,
-  createdAt: iso(i.createdAt),
-  updatedAt: iso(i.updatedAt),
-});
-
-const eventJson = (e: ItemEvent) => ({
-  id: e.id,
-  itemId: e.itemId,
-  type: e.type,
-  name: e.name,
-  data: e.data === null ? null : JSON.parse(e.data),
-  source: e.source,
-  at: iso(e.createdAt),
-});
 
 const result = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
 
