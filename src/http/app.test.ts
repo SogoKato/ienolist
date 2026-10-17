@@ -7,7 +7,9 @@ import { loadConfig, type Config } from "../config.ts";
 import { createTestDb } from "../db/testing.ts";
 import { createItemService } from "../items/service.ts";
 import { sha256 } from "../lib/token.ts";
+import { createOAuthService } from "../oauth/service.ts";
 import { createApp } from "./app.ts";
+import { Browser as Shared, ORIGIN, setUpHousehold, signIn } from "./testing.ts";
 
 // Response.json() is typed unknown; the tests inspect arbitrary payloads.
 declare global {
@@ -16,7 +18,6 @@ declare global {
   }
 }
 
-const ORIGIN = "https://lists.example.com";
 let raw: DatabaseSync;
 let config: Config;
 let app: ReturnType<typeof createApp>;
@@ -27,7 +28,7 @@ function build(env: Record<string, string> = {}) {
   raw = t.raw;
   config = loadConfig({ PUBLIC_URL: ORIGIN, ...env });
   const auth = createAuthService(t.db, { rp: config.rp, setupToken: config.setupToken, now: () => clock });
-  app = createApp({ config, auth, items: createItemService(t.db, { now: () => clock }) });
+  app = createApp({ config, auth, items: createItemService(t.db, { now: () => clock }), oauth: createOAuthService(t.db, { origin: config.origin, now: () => clock }) });
 }
 
 beforeEach(() => {
@@ -35,43 +36,14 @@ beforeEach(() => {
   build();
 });
 
-// A browser, as far as these tests need: it keeps cookies and sends the Origin header.
-class Browser {
-  cookies = new Map<string, string>();
-  origin: string | null = ORIGIN;
-
-  async fetch(method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
-    const sent: Record<string, string> = { ...headers };
-    if (this.cookies.size) sent.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
-    if (this.origin && method !== "GET") sent.origin = this.origin;
-    if (body !== undefined && !sent["content-type"]) sent["content-type"] = "application/json";
-    const res = await app.request(`${ORIGIN}${path}`, { method, headers: sent, body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body) });
-    for (const line of res.headers.getSetCookie()) {
-      const [pair] = line.split(";");
-      const [name, ...value] = pair.split("=");
-      if (/max-age=0/i.test(line) || value.join("=") === "") this.cookies.delete(name);
-      else this.cookies.set(name, value.join("="));
-    }
-    return res;
+// The browser helper, bound to this file's app.
+class Browser extends Shared {
+  constructor() {
+    super((url, init) => app.request(url, init), ORIGIN);
   }
-  get = (path: string) => this.fetch("GET", path);
-  post = (path: string, body: unknown = {}) => this.fetch("POST", path, body);
-  patch = (path: string, body: unknown) => this.fetch("PATCH", path, body);
-  delete = (path: string) => this.fetch("DELETE", path);
 }
 
-async function setUp(browser = new Browser(), name = "Aki") {
-  const device = await VirtualAuthenticator.create();
-  const start = await (await browser.post("/api/setup/options", { displayName: name, householdName: "Home" })).json();
-  const res = await browser.post("/api/setup/finish", { challengeId: start.challengeId, response: await device.register(start.options, ORIGIN), deviceName: "Phone" });
-  assert.equal(res.status, 201);
-  return { browser, device, me: await res.json() };
-}
-
-async function signIn(browser: Browser, device: VirtualAuthenticator) {
-  const start = await (await browser.post("/api/login/options")).json();
-  return browser.post("/api/login/finish", { challengeId: start.challengeId, response: await device.authenticate(start.options, ORIGIN) });
-}
+const setUp = (browser = new Browser(), name = "Aki") => setUpHousehold(browser, name);
 
 async function invite(admin: Browser, body: object = {}) {
   const res = await admin.post("/api/invites", body);
@@ -134,7 +106,7 @@ test("on localhost over http the cookie drops the prefix and Secure so it can wo
   const local = "http://localhost:8787";
   const t = createTestDb();
   const cfg = loadConfig({ PUBLIC_URL: local });
-  app = createApp({ config: cfg, auth: createAuthService(t.db, { rp: cfg.rp }), items: createItemService(t.db) });
+  app = createApp({ config: cfg, auth: createAuthService(t.db, { rp: cfg.rp }), items: createItemService(t.db), oauth: createOAuthService(t.db, { origin: cfg.origin }) });
   const device = await VirtualAuthenticator.create();
   const post = (path: string, body: unknown) =>
     app.request(`${local}${path}`, { method: "POST", headers: { "content-type": "application/json", origin: local }, body: JSON.stringify(body) });
