@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { beforeEach, test } from "node:test";
 import { createTestDb } from "../db/testing.ts";
 import { createItemService, type Actor, type ItemService } from "../items/service.ts";
+import { createRecipeService } from "../recipes/service.ts";
 import { handleMcpRequest, type McpDeps } from "./endpoint.ts";
 
 // Response.json() is typed unknown; the tests inspect arbitrary JSON-RPC payloads.
@@ -13,7 +14,7 @@ declare global {
 }
 
 const claude: Actor = { householdId: "h1", userId: "u1", source: "mcp", clientId: "c1" };
-const ALL = ["items:read", "items:write"];
+const ALL = ["items:read", "items:write", "recipes:read", "recipes:write"];
 let raw: DatabaseSync;
 let items: ItemService;
 let deps: McpDeps;
@@ -26,7 +27,7 @@ beforeEach(() => {
   raw.exec("INSERT INTO users (id, display_name, created_at) VALUES ('u1', 'A', 0), ('u2', 'B', 0)");
   items = createItemService(t.db);
   principal = { actor: claude, scopes: ALL };
-  deps = { authenticate: async () => principal, resourceMetadataUrl: () => "https://app.test/.well-known/oauth-protected-resource/mcp", items };
+  deps = { authenticate: async () => principal, resourceMetadataUrl: () => "https://app.test/.well-known/oauth-protected-resource/mcp", items, recipes: createRecipeService(t.db) };
 });
 
 const V = "2026-07-28";
@@ -65,7 +66,10 @@ test("modern: server/discover and tools/list", async () => {
   const list = (await (await modern("tools/list")).json()).result;
   assert.equal(list.resultType, "complete");
   assert.equal(list.cacheScope, "private");
-  assert.deepEqual(list.tools.map((t: { name: string }) => t.name), ["list_items", "get_item", "create_item", "update_item", "delete_item", "move_item", "list_events"]);
+  assert.deepEqual(list.tools.map((t: { name: string }) => t.name), [
+    "list_items", "get_item", "create_item", "update_item", "delete_item", "move_item", "list_events",
+    "list_recipes", "get_recipe", "create_recipe", "update_recipe", "delete_recipe", "record_cook", "list_cooks", "delete_cook",
+  ]);
   const byName = Object.fromEntries(list.tools.map((t: { name: string }) => [t.name, t]));
   assert.deepEqual(byName.list_items.annotations, { readOnlyHint: true });
   assert.deepEqual(byName.delete_item.annotations, { destructiveHint: true });
@@ -87,7 +91,7 @@ test("legacy: initialize, notifications and tools/list without resultType", asyn
   assert.equal((await post({ jsonrpc: "2.0", method: "notifications/initialized" })).status, 202);
   const list = (await (await post(rpc(2, "tools/list"))).json()).result;
   assert.equal(list.resultType, undefined);
-  assert.equal(list.tools.length, 7);
+  assert.equal(list.tools.length, 15);
 });
 
 test("modern protocol errors", async () => {
@@ -265,4 +269,71 @@ test("the history records which client made each change", async () => {
   await modernCall("update_item", { id: created.id, status: "used_up" });
   const clients = raw.prepare("SELECT client_id AS c FROM item_events ORDER BY id").all().map((r) => r.c);
   assert.deepEqual(clients, ["c1", "other-client"]);
+});
+
+// --- recipes ---------------------------------------------------------------------------------------------
+
+test("recipes: save one, find it by an ingredient, record cooking it, and see it counted", async () => {
+  const curry = data(await modernCall("create_recipe", { title: "チキンカレー", url: "https://example.com/curry", body: "鶏もも肉 300g\n玉ねぎ 2個" }));
+  assert.deepEqual([curry.title, curry.url, curry.body], ["チキンカレー", "https://example.com/curry", "鶏もも肉 300g\n玉ねぎ 2個"]);
+  await modernCall("create_recipe", { title: "味噌汁" });
+
+  const found = data(await modernCall("list_recipes", { query: "玉ねぎ" })).recipes;
+  assert.deepEqual(found.map((r: { title: string }) => r.title), ["チキンカレー"]);
+  assert.equal(found[0].body, undefined);
+  assert.equal(data(await modernCall("list_recipes", { query: "玉ねぎ", withBody: true })).recipes[0].body, "鶏もも肉 300g\n玉ねぎ 2個");
+
+  const cook = data(await modernCall("record_cook", { recipeId: curry.id, cookedOn: "2026-10-18", note: "辛口" }));
+  assert.deepEqual([cook.recipeId, cook.title, cook.cookedOn, cook.note, cook.source], [curry.id, "チキンカレー", "2026-10-18", "辛口", "mcp"]);
+  const got = data(await modernCall("get_recipe", { id: curry.id }));
+  assert.deepEqual([got.cookCount, got.lastCookedOn], [1, "2026-10-18"]);
+  assert.deepEqual(data(await modernCall("list_cooks", { since: "2026-10-01" })).cooks.map((c: { id: string }) => c.id), [cook.id]);
+
+  assert.equal(data(await modernCall("update_recipe", { id: curry.id, url: null })).url, null);
+  assert.deepEqual(data(await modernCall("delete_cook", { id: cook.id })), { deleted: cook.id });
+  assert.deepEqual(data(await modernCall("delete_recipe", { id: curry.id })), { deleted: curry.id });
+  assert.equal((await modernCall("get_recipe", { id: curry.id })).content[0].text, "Recipe not found");
+});
+
+test("recipes: bad dates and links come back as errors the model can fix", async () => {
+  const curry = data(await modernCall("create_recipe", { title: "カレー" }));
+  const badDate = await modernCall("record_cook", { recipeId: curry.id, cookedOn: "10/18" });
+  assert.equal(badDate.isError, true);
+  assert.match(badDate.content[0].text, /^Invalid arguments: cookedOn/);
+  const notADay = await modernCall("record_cook", { recipeId: curry.id, cookedOn: "2026-02-30" });
+  assert.deepEqual([notADay.isError, notADay.content[0].text], [true, "cookedOn must be a date, YYYY-MM-DD"]);
+  const badUrl = await modernCall("create_recipe", { title: "x", url: "javascript:alert(1)" });
+  assert.deepEqual([badUrl.isError, badUrl.content[0].text], [true, "url must be an http or https URL"]);
+});
+
+test("scopes: a token for the lists alone cannot reach the recipes, and recipes:read cannot write", async () => {
+  const curry = data(await modernCall("create_recipe", { title: "カレー" }));
+  // What claude.ai and ChatGPT hold from before recipes existed.
+  principal = { actor: claude, scopes: ["items:read", "items:write"] };
+  assert.deepEqual((await modernCall("list_recipes")).content[0].text, "Missing scope: recipes:read");
+  assert.deepEqual((await modernCall("list_cooks")).content[0].text, "Missing scope: recipes:read");
+  assert.equal((await modernCall("list_items")).isError, undefined);
+
+  principal = { actor: claude, scopes: ["recipes:read"] };
+  assert.equal(data(await modernCall("list_recipes")).recipes.length, 1);
+  for (const [name, args] of [
+    ["create_recipe", { title: "x" }], ["update_recipe", { id: curry.id, title: "x" }], ["delete_recipe", { id: curry.id }],
+    ["record_cook", { recipeId: curry.id, cookedOn: "2026-10-18" }], ["delete_cook", { id: "x" }],
+  ] as const) {
+    const r = await modernCall(name, args);
+    assert.deepEqual([r.isError, r.content[0].text], [true, "Missing scope: recipes:write"], name);
+  }
+  assert.equal((await modernCall("list_items")).content[0].text, "Missing scope: items:read");
+});
+
+test("a household's tokens only reach its own recipes and cook records", async () => {
+  const curry = data(await modernCall("create_recipe", { title: "カレー", body: "秘伝" }));
+  const cook = data(await modernCall("record_cook", { recipeId: curry.id, cookedOn: "2026-10-18" }));
+  principal = { actor: { householdId: "h2", userId: "u2", source: "mcp", clientId: "c2" }, scopes: ALL };
+  assert.deepEqual(data(await modernCall("list_recipes", { query: "秘伝" })).recipes, []);
+  assert.deepEqual(data(await modernCall("list_cooks")).cooks, []);
+  assert.equal((await modernCall("get_recipe", { id: curry.id })).content[0].text, "Recipe not found");
+  assert.equal((await modernCall("record_cook", { recipeId: curry.id, cookedOn: "2026-10-18" })).isError, true);
+  assert.equal((await modernCall("delete_cook", { id: cook.id })).isError, true);
+  assert.equal((await modernCall("delete_recipe", { id: curry.id })).isError, true);
 });

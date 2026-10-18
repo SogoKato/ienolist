@@ -147,7 +147,7 @@ test("a good request is accepted with every scope by default", async () => {
   const parsed = await oauth.parseAuthorization(authParams(clientId, challenge));
   assert.deepEqual(parsed, {
     kind: "ok",
-    request: { clientId, clientName: "Claude", redirectUri: REDIRECT, codeChallenge: challenge, scope: "items:read items:write", state: "xyz", resource: `${ORIGIN}/mcp` },
+    request: { clientId, clientName: "Claude", redirectUri: REDIRECT, codeChallenge: challenge, scope: "items:read items:write recipes:read recipes:write", state: "xyz", resource: `${ORIGIN}/mcp` },
   });
 });
 
@@ -248,8 +248,8 @@ test("a code and its verifier are traded for tokens that work as a grant for thi
   const { clientId, tokens } = await connect();
   assert.equal(tokens.token_type, "Bearer");
   assert.equal(tokens.expires_in, 3600);
-  assert.equal(tokens.scope, "items:read items:write");
-  assert.deepEqual(await oauth.verifyAccessToken(tokens.access_token), { userId: "u1", householdId: "h1", clientId, scopes: ["items:read", "items:write"] });
+  assert.equal(tokens.scope, "items:read items:write recipes:read recipes:write");
+  assert.deepEqual(await oauth.verifyAccessToken(tokens.access_token), { userId: "u1", householdId: "h1", clientId, scopes: ["items:read", "items:write", "recipes:read", "recipes:write"] });
   // Only hashes are kept.
   const stored = { ...raw.prepare("SELECT access_hash, refresh_hash FROM oauth_tokens").get()! };
   assert.deepEqual(stored, { access_hash: await sha256(tokens.access_token), refresh_hash: await sha256(tokens.refresh_token) });
@@ -406,7 +406,7 @@ test("a person sees only their own connections, newest first, and can disconnect
   await connect(bo);
 
   const mine = await oauth.listConnections(aki);
-  assert.deepEqual(mine.map((c) => c.scopes), [["items:read", "items:write"], ["items:read"]]);
+  assert.deepEqual(mine.map((c) => c.scopes), [["items:read", "items:write", "recipes:read", "recipes:write"], ["items:read"]]);
   assert.deepEqual(mine.map((c) => c.clientName), ["Claude", "Claude"]);
   assert.equal(mine[0].createdAt, clock);
   assert.equal((await oauth.listConnections(bo)).length, 1);
@@ -459,13 +459,13 @@ test("the metadata points at this app's endpoints", () => {
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
-    scopes_supported: ["items:read", "items:write"],
+    scopes_supported: ["items:read", "items:write", "recipes:read", "recipes:write"],
     authorization_response_iss_parameter_supported: true,
   });
   assert.deepEqual(oauth.protectedResourceMetadata("Home lists"), {
     resource: `${ORIGIN}/mcp`,
     authorization_servers: [ORIGIN],
-    scopes_supported: ["items:read", "items:write"],
+    scopes_supported: ["items:read", "items:write", "recipes:read", "recipes:write"],
     bearer_methods_supported: ["header"],
     resource_name: "Home lists",
   });

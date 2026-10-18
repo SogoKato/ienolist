@@ -14,6 +14,9 @@ export const EVENT_SOURCES = ["web", "mcp"] as const;
 
 export const NAME_MAX = 500;
 export const NOTE_MAX = 2000;
+export const TITLE_MAX = 200;
+export const URL_MAX = 2000;
+export const BODY_MAX = 20000;
 
 const quoted = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(", "));
 
@@ -202,5 +205,56 @@ export const itemEvents = sqliteTable(
     index("item_events_item").on(t.itemId),
     check("item_events_type", sql`${t.type} IN (${quoted(EVENT_TYPES)})`),
     check("item_events_source", sql`${t.source} IN (${quoted(EVENT_SOURCES)})`),
+  ],
+);
+
+// --- recipes and when they were cooked ---------------------------------------
+
+// A link and/or free text. Nothing is fetched from the URL on the server.
+export const recipes = sqliteTable(
+  "recipes",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id").notNull().references(() => households.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    url: text("url"),
+    body: text("body"),
+    addedBy: text("added_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [
+    index("recipes_household_updated").on(t.householdId, t.updatedAt),
+    check("recipes_title_length", sql`length(${t.title}) BETWEEN 1 AND ${sql.raw(String(TITLE_MAX))}`),
+    check(
+      "recipes_url",
+      sql`${t.url} IS NULL OR (length(${t.url}) <= ${sql.raw(String(URL_MAX))} AND (${t.url} LIKE 'https://%' OR ${t.url} LIKE 'http://%'))`,
+    ),
+    check("recipes_body_length", sql`${t.body} IS NULL OR length(${t.body}) <= ${sql.raw(String(BODY_MAX))}`),
+  ],
+);
+
+// One row per time a recipe was cooked. The record outlives the recipe (recipe_id becomes
+// NULL), so the title is snapshotted. cooked_on is the cook's calendar date, YYYY-MM-DD.
+export const recipeCooks = sqliteTable(
+  "recipe_cooks",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id").notNull().references(() => households.id, { onDelete: "cascade" }),
+    recipeId: text("recipe_id").references(() => recipes.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    cookedOn: text("cooked_on").notNull(),
+    note: text("note"),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    source: text("source", { enum: EVENT_SOURCES }).notNull(),
+    clientId: text("client_id"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    index("recipe_cooks_household_date").on(t.householdId, t.cookedOn),
+    index("recipe_cooks_recipe").on(t.recipeId),
+    check("recipe_cooks_date", sql`${t.cookedOn} GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'`),
+    check("recipe_cooks_note_length", sql`${t.note} IS NULL OR length(${t.note}) <= ${sql.raw(String(NOTE_MAX))}`),
+    check("recipe_cooks_source", sql`${t.source} IN (${quoted(EVENT_SOURCES)})`),
   ],
 );

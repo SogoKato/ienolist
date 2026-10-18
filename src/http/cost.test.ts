@@ -61,6 +61,7 @@ test("a signed-in page load is one lookup for who you are and one for the data",
   assert.equal(await cost(() => person.get("/api/connections")), 2);
   assert.equal(await cost(() => person.get("/api/passkeys")), 2);
   assert.equal(await cost(() => person.get("/api/events")), 2);
+  assert.equal(await cost(() => person.get("/api/recipes")), 2);
 });
 
 test("changing an item is the lookup plus one write batch", async () => {
@@ -73,6 +74,10 @@ test("changing an item is the lookup plus one write batch", async () => {
 test("an assistant's call is one lookup for the token plus the work", async () => {
   assert.equal(await cost(() => mcp("list_items")), 2);
   assert.equal(await cost(() => mcp("create_item", { list: "shopping", name: "x" })), 3);
+  const recipe = JSON.parse((await (await mcp("create_recipe", { title: "カレー" })).json()).result.content[0].text);
+  assert.equal(await cost(() => mcp("list_recipes", { withBody: true })), 2);
+  assert.equal(await cost(() => mcp("get_recipe", { id: recipe.id })), 2);
+  assert.equal(await cost(() => mcp("record_cook", { recipeId: recipe.id, cookedOn: "2026-10-18" })), 3);
 });
 
 test("the consent decision does not sweep the database one table at a time", async () => {

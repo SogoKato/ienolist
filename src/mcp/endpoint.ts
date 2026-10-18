@@ -1,4 +1,5 @@
 import type { Actor, ItemService } from "../items/service.ts";
+import type { RecipeService } from "../recipes/service.ts";
 import { createMcpHandler } from "./protocol.ts";
 import { TOOLS_JSON } from "./tools.generated.ts";
 import { tools, userFacingError } from "./tools.ts";
@@ -11,6 +12,7 @@ export type McpDeps = {
   // Where the client can discover the authorization server (RFC 9728).
   resourceMetadataUrl(request: Request): string;
   items: ItemService;
+  recipes: RecipeService;
 };
 
 const handle = createMcpHandler({ serverInfo: { name: "household-lists", version: "0.0.0" }, tools, toolsJson: TOOLS_JSON, userFacingError });
@@ -26,5 +28,5 @@ export async function handleMcpRequest(request: Request, deps: McpDeps): Promise
       },
     });
   }
-  return handle(request, { items: deps.items, actor: principal.actor }, principal.scopes);
+  return handle(request, { items: deps.items, recipes: deps.recipes, actor: principal.actor }, principal.scopes);
 }

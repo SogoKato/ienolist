@@ -127,6 +127,46 @@ test("a change made on one device is there on the other", async () => {
   await expect(aki.getByText("パン")).toBeVisible();
 });
 
+test("a recipe is added with a link and notes, found by an ingredient, cooked today, and edited", async () => {
+  await aki.goto("/");
+  await aki.getByRole("tab", { name: "レシピ" }).click();
+  await expect(aki).toHaveURL(/\/recipes$/);
+  await expect(aki.getByText("まだレシピがありません。")).toBeVisible();
+
+  await aki.getByRole("link", { name: "追加", exact: true }).click();
+  await aki.getByLabel("料理名").fill("チキンカレー");
+  await aki.getByLabel("レシピの URL（任意）").fill("https://example.com/curry");
+  await aki.getByLabel(/^メモ/).fill("鶏もも肉 300g\n玉ねぎ 2個\nルーは半分");
+  await aki.getByRole("button", { name: "追加", exact: true }).click();
+
+  await expect(aki.getByRole("heading", { name: "チキンカレー" })).toBeVisible();
+  await expect(aki.getByRole("link", { name: /example\.com で開く/ })).toHaveAttribute("href", "https://example.com/curry");
+  await expect(aki.getByText("ルーは半分")).toBeVisible();
+  await aki.getByLabel("作った記録のひとこと").fill("辛口にした");
+  await aki.getByRole("button", { name: "作った", exact: true }).click();
+  const today = new Date();
+  await expect(aki.getByRole("region", { name: "作った記録" }).getByText(`${today.getMonth() + 1}/${today.getDate()}`)).toBeVisible();
+  await expect(aki.getByRole("region", { name: "作った記録" }).getByText("辛口にした")).toBeVisible();
+
+  await aki.getByRole("button", { name: "編集" }).click();
+  await aki.getByLabel("料理名").fill("バターチキンカレー");
+  await aki.getByRole("button", { name: "保存" }).click();
+  await expect(aki.getByRole("heading", { name: "バターチキンカレー" })).toBeVisible();
+
+  await aki.getByRole("link", { name: "レシピへ" }).click();
+  await aki.getByLabel("レシピを探す").fill("玉ねぎ");
+  await expect(aki.getByRole("link", { name: /バターチキンカレー.*1回/ })).toBeVisible();
+  await aki.getByLabel("レシピを探す").fill("豚肉");
+  await expect(aki.getByText("見つかりませんでした。")).toBeVisible();
+
+  // The list tabs still work from here, and keep their place in the address.
+  await aki.getByRole("tab", { name: /冷蔵庫/ }).click();
+  await expect(aki).toHaveURL(/\/\?list=fridge$/);
+  await expect(aki.getByText("牛乳")).toBeVisible();
+  await aki.reload();
+  await expect(aki.getByRole("tab", { name: /冷蔵庫/ })).toHaveAttribute("aria-selected", "true");
+});
+
 test.describe("connecting an assistant", () => {
   const redirect = "https://claude.ai/api/mcp/auth_callback";
   let clientId = "";
@@ -163,6 +203,7 @@ test.describe("connecting an assistant", () => {
     await expect(aki.getByText("E2E アシスタント")).toBeVisible();
     await expect(aki.getByText("claude.ai")).toBeVisible();
     await expect(aki.getByText("アイテムを追加・変更・削除・移動する")).toBeVisible();
+    await expect(aki.getByText("レシピと作った記録を追加・変更・削除する")).toBeVisible();
     await aki.getByRole("button", { name: "許可する" }).click();
 
     await aki.waitForURL((url) => url.origin === "https://claude.ai");
@@ -188,13 +229,26 @@ test.describe("connecting an assistant", () => {
     });
     const items = JSON.parse((await call.json()).result.content[0].text).items.map((i: { name: string }) => i.name);
     expect(items).toEqual(expect.arrayContaining(["牛乳", "卵", "パン"]));
+
+    // And the recipes added in the app, with how often they were cooked.
+    const recipes = await aki.request.post("/mcp", {
+      headers: { authorization: `Bearer ${access}`, "mcp-protocol-version": V, "mcp-method": "tools/call", "mcp-name": "list_recipes" },
+      data: {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "list_recipes", arguments: { query: "玉ねぎ" }, _meta: { "io.modelcontextprotocol/protocolVersion": V, "io.modelcontextprotocol/clientInfo": { name: "e2e", version: "0" }, "io.modelcontextprotocol/clientCapabilities": {} } },
+      },
+    });
+    const found = JSON.parse((await recipes.json()).result.content[0].text).recipes;
+    expect(found.map((r: { title: string; cookCount: number }) => [r.title, r.cookCount])).toEqual([["バターチキンカレー", 1]]);
     accessToken = access;
   });
 
   test("the connection is listed in the settings, and disconnecting cuts it off", async () => {
     await aki.goto("/settings");
     await expect(aki.getByText("E2E アシスタント")).toBeVisible();
-    await expect(aki.getByText("閲覧と編集")).toBeVisible();
+    await expect(aki.getByText("リスト: 閲覧と編集 ・ レシピ: 閲覧と編集")).toBeVisible();
     await aki.getByRole("button", { name: "解除" }).click();
     await expect(aki.getByText("接続はありません。")).toBeVisible();
 

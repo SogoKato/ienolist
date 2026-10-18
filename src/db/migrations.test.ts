@@ -169,6 +169,29 @@ test("the migrations leave only the tables the schema declares", () => {
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name);
   assert.deepEqual(tables, [
     "app_meta", "challenges", "households", "invites", "item_events", "items", "memberships",
-    "oauth_clients", "oauth_codes", "oauth_tokens", "passkeys", "sessions", "users",
+    "oauth_clients", "oauth_codes", "oauth_tokens", "passkeys", "recipe_cooks", "recipes", "sessions", "users",
   ]);
+});
+
+const addRecipe = (id: string, household = "h1", url: string | null = null) =>
+  db.prepare("INSERT INTO recipes (id, household_id, title, url, created_at, updated_at) VALUES (?, ?, 'curry', ?, 0, 0)").run(id, household, url);
+const addCook = (id: string, recipe: string | null, cookedOn = "2026-10-01") =>
+  db.prepare("INSERT INTO recipe_cooks (id, household_id, recipe_id, title, cooked_on, source, created_at) VALUES (?, 'h1', ?, 'curry', ?, 'web', 0)").run(id, recipe, cookedOn);
+
+test("recipes take only web links", () => {
+  addRecipe("r1", "h1", "https://example.com/a");
+  addRecipe("r2", "h1", "http://example.com/a");
+  assert.throws(() => addRecipe("r3", "h1", "javascript:alert(1)"), /recipes_url/);
+  assert.throws(() => addRecipe("r4", "nope"), /FOREIGN KEY/);
+});
+
+test("cook records outlive their recipe and go away with the household", () => {
+  addRecipe("r1");
+  addCook("c1", "r1");
+  assert.throws(() => addCook("c2", "r1", "2026/10/01"), /recipe_cooks_date/);
+  assert.throws(() => addCook("c3", "nope"), /FOREIGN KEY/);
+  db.exec("DELETE FROM recipes WHERE id = 'r1'");
+  assert.equal(db.prepare("SELECT recipe_id AS r FROM recipe_cooks WHERE id = 'c1'").get()!.r, null);
+  db.exec("DELETE FROM households WHERE id = 'h1'");
+  assert.equal(count("recipe_cooks"), 0);
 });

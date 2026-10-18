@@ -11,6 +11,8 @@ type Answer = Ask | { redirectTo: string };
 const SCOPE_TEXT: Record<string, string> = {
   "items:read": "買い物リストと冷蔵庫リストを見る",
   "items:write": "アイテムを追加・変更・削除・移動する",
+  "recipes:read": "レシピと、いつ何を作ったかを見る",
+  "recipes:write": "レシピと作った記録を追加・変更・削除する",
 };
 
 // Where an assistant (Claude, ChatGPT, …) asks to use the lists on the person's behalf.

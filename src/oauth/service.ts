@@ -4,9 +4,9 @@ import { atomically, type Db } from "../db/types.ts";
 import type { Principal } from "../auth/service.ts";
 import { ulid } from "../lib/ulid.ts";
 import { randomToken, safeEqual, sha256 } from "../lib/token.ts";
-import { SCOPE_READ, SCOPE_WRITE } from "../mcp/tools.ts";
+import { SCOPE_READ, SCOPE_RECIPES_READ, SCOPE_RECIPES_WRITE, SCOPE_WRITE } from "../mcp/tools.ts";
 
-export const SCOPES = [SCOPE_READ, SCOPE_WRITE] as const;
+export const SCOPES = [SCOPE_READ, SCOPE_WRITE, SCOPE_RECIPES_READ, SCOPE_RECIPES_WRITE] as const;
 
 const CODE_TTL = 5 * 60;
 const ACCESS_TTL = 60 * 60;

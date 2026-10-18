@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link } from "wouter";
+import { useSearch } from "wouter";
 import { api, type Item, type List } from "../api";
+import { MainHeader, MainTabs } from "../nav";
 import { describeError } from "../passkeys";
 import { ErrorText } from "../ui";
 
@@ -13,7 +14,8 @@ const LISTS = {
 const REFRESH_MS = 20_000;
 
 export function Lists() {
-  const [list, setList] = useState<List>("shopping");
+  // The list is in the address (/ or /?list=fridge), so the tabs are plain links.
+  const list: List = new URLSearchParams(useSearch()).get("list") === "fridge" ? "fridge" : "shopping";
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
 
@@ -56,21 +58,8 @@ export function Lists() {
 
   return (
     <main className="page">
-      <header className="bar">
-        <h1>家のリスト</h1>
-        <Link href="/settings" className="icon-link" aria-label="設定">
-          設定
-        </Link>
-      </header>
-
-      <div className="tabs" role="tablist">
-        {(Object.keys(LISTS) as List[]).map((key) => (
-          <button key={key} role="tab" aria-selected={list === key} className={list === key ? "tab active" : "tab"} onClick={() => setList(key)}>
-            {LISTS[key].label}
-            <span className="count">{(items ?? []).filter((i) => i.list === key && i.status === LISTS[key].open).length}</span>
-          </button>
-        ))}
-      </div>
+      <MainHeader />
+      <MainTabs active={list} counts={Object.fromEntries((Object.keys(LISTS) as List[]).map((key) => [key, (items ?? []).filter((i) => i.list === key && i.status === LISTS[key].open).length]))} />
 
       <AddForm
         placeholder={config.placeholder}

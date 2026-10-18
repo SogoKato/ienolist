@@ -38,6 +38,14 @@ export function Settings() {
   );
 }
 
+// What a connection may do, per kind of data. Connections made before recipes existed have no
+// recipe scopes; they get them by connecting again.
+function access(scopes: string[]): string {
+  const level = (kind: string) => (scopes.includes(`${kind}:write`) ? "閲覧と編集" : scopes.includes(`${kind}:read`) ? "閲覧のみ" : "なし");
+  const recipes = level("recipes");
+  return `リスト: ${level("items")} ・ レシピ: ${recipes}${recipes === "なし" ? "（使うには接続し直してください）" : ""}`;
+}
+
 function Connections({ onError }: { onError(message: string): void }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const load = useCallback(() => api.get<{ connections: Connection[] }>("/api/connections").then((r) => setConnections(r.connections), (e) => onError(describeError(e))), [onError]);
@@ -55,7 +63,7 @@ function Connections({ onError }: { onError(message: string): void }) {
           <li key={c.id}>
             <span>
               <strong>{c.clientName}</strong>
-              <span className="muted"> {formatDate(c.createdAt)} から ・ {c.scopes.includes("items:write") ? "閲覧と編集" : "閲覧のみ"}</span>
+              <span className="muted"> {formatDate(c.createdAt)} から ・ {access(c.scopes)}</span>
             </span>
             <button
               onClick={async () => {

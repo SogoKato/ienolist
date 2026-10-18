@@ -5,6 +5,7 @@ import { Authorize } from "./pages/Authorize";
 import { Join } from "./pages/Join";
 import { Lists } from "./pages/Lists";
 import { Login } from "./pages/Login";
+import { NewRecipe, RecipeDetail, Recipes } from "./pages/Recipes";
 import { Settings } from "./pages/Settings";
 import { Setup } from "./pages/Setup";
 import { SessionProvider, useSession } from "./session";
@@ -43,6 +44,23 @@ export function App() {
           <Private>
             <Settings />
           </Private>
+        </Route>
+        <Route path="/recipes">
+          <Private>
+            <Recipes />
+          </Private>
+        </Route>
+        <Route path="/recipes/new">
+          <Private>
+            <NewRecipe />
+          </Private>
+        </Route>
+        <Route path="/recipes/:id">
+          {(params) => (
+            <Private>
+              <RecipeDetail key={params.id} id={params.id} />
+            </Private>
+          )}
         </Route>
         <Route path="/">
           <Private>

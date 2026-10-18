@@ -120,6 +120,20 @@ try {
   const events = (await (await person.get(`/api/events?itemId=${created.id}`)).json()).events;
   assert.deepEqual(events.map((e: { source: string }) => e.source), ["mcp", "mcp"]);
 
+  // Recipes exercise what D1 has to get right: correlated counts, UPDATE ... RETURNING,
+  // the date CHECK, and cook records outliving their recipe (ON DELETE SET NULL).
+  await step("recipes and cook records over MCP", async () => {
+    const recipe = await call(tokens.access_token, "create_recipe", { title: "カレー", url: "https://example.com/curry", body: "玉ねぎ 2個" });
+    await call(tokens.access_token, "record_cook", { recipeId: recipe.id, cookedOn: "2026-10-18" });
+    await call(tokens.access_token, "update_recipe", { id: recipe.id, title: "チキンカレー" });
+    const [listed] = (await call(tokens.access_token, "list_recipes", { query: "玉ねぎ" })).recipes;
+    assert.deepEqual([listed.title, listed.cookCount, listed.lastCookedOn], ["チキンカレー", 1, "2026-10-18"]);
+    await call(tokens.access_token, "delete_recipe", { id: recipe.id });
+    const [cook] = (await call(tokens.access_token, "list_cooks")).cooks;
+    assert.deepEqual([cook.recipeId, cook.title], [null, "カレー"]);
+    await call(tokens.access_token, "delete_cook", { id: cook.id });
+  });
+
   const refreshed = await step("refresh the token", async () => {
     const res = await client("POST", "/oauth/token", {
       headers: { "content-type": "application/x-www-form-urlencoded" },

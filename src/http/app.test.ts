@@ -6,6 +6,7 @@ import { VirtualAuthenticator } from "../auth/virtual-authenticator.ts";
 import { loadConfig, type Config } from "../config.ts";
 import { createTestDb } from "../db/testing.ts";
 import { createItemService } from "../items/service.ts";
+import { createRecipeService } from "../recipes/service.ts";
 import { sha256 } from "../lib/token.ts";
 import { createOAuthService } from "../oauth/service.ts";
 import { createApp } from "./app.ts";
@@ -28,7 +29,7 @@ function build(env: Record<string, string> = {}) {
   raw = t.raw;
   config = loadConfig({ PUBLIC_URL: ORIGIN, ...env });
   const auth = createAuthService(t.db, { rp: config.rp, setupToken: config.setupToken, now: () => clock });
-  app = createApp({ config, auth, items: createItemService(t.db, { now: () => clock }), oauth: createOAuthService(t.db, { origin: config.origin, now: () => clock }) });
+  app = createApp({ config, auth, items: createItemService(t.db, { now: () => clock }), recipes: createRecipeService(t.db, { now: () => clock }), oauth: createOAuthService(t.db, { origin: config.origin, now: () => clock }) });
 }
 
 beforeEach(() => {
@@ -106,7 +107,7 @@ test("on localhost over http the cookie drops the prefix and Secure so it can wo
   const local = "http://localhost:8787";
   const t = createTestDb();
   const cfg = loadConfig({ PUBLIC_URL: local });
-  app = createApp({ config: cfg, auth: createAuthService(t.db, { rp: cfg.rp }), items: createItemService(t.db), oauth: createOAuthService(t.db, { origin: cfg.origin }) });
+  app = createApp({ config: cfg, auth: createAuthService(t.db, { rp: cfg.rp }), items: createItemService(t.db), recipes: createRecipeService(t.db), oauth: createOAuthService(t.db, { origin: cfg.origin }) });
   const device = await VirtualAuthenticator.create();
   const post = (path: string, body: unknown) =>
     app.request(`${local}${path}`, { method: "POST", headers: { "content-type": "application/json", origin: local }, body: JSON.stringify(body) });
@@ -332,6 +333,58 @@ test("a household's lists are invisible to another household", async () => {
   assert.equal((await eve.delete(`/api/items/${item.id}`)).status, 404);
   assert.deepEqual((await (await eve.get("/api/events")).json()).events, []);
   assert.equal((await (await aki.get(`/api/items/${item.id}`)).json()).name, "egg");
+});
+
+// --- recipes ---------------------------------------------------------------------------------------------
+
+test("a recipe is saved, searched, cooked on a day the browser chooses, and deleted without losing the record", async () => {
+  const { browser } = await setUp();
+  const created = await browser.post("/api/recipes", { title: "チキンカレー", url: "https://example.com/curry", body: "鶏もも肉" });
+  assert.equal(created.status, 201);
+  const curry = await created.json();
+  await browser.post("/api/recipes", { title: "味噌汁" });
+
+  assert.deepEqual((await (await browser.get("/api/recipes?q=" + encodeURIComponent("鶏"))).json()).recipes.map((r: { title: string }) => r.title), ["チキンカレー"]);
+  assert.equal((await (await browser.get(`/api/recipes/${curry.id}`)).json()).body, "鶏もも肉");
+  assert.equal((await (await browser.patch(`/api/recipes/${curry.id}`, { body: "鶏もも肉 300g" })).json()).body, "鶏もも肉 300g");
+
+  const cooked = await browser.post(`/api/recipes/${curry.id}/cooks`, { cookedOn: "2026-10-18" });
+  assert.equal(cooked.status, 201);
+  const cook = await cooked.json();
+  assert.equal(cook.source, "web");
+  assert.deepEqual((await (await browser.get(`/api/recipes/${curry.id}/cooks`)).json()).cooks.map((c: { id: string }) => c.id), [cook.id]);
+  assert.equal((await browser.post(`/api/recipes/${curry.id}/cooks`, { cookedOn: "2026-13-01" })).status, 400);
+
+  assert.equal((await browser.delete(`/api/recipes/${curry.id}`)).status, 204);
+  assert.equal((await browser.get(`/api/recipes/${curry.id}`)).status, 404);
+  assert.deepEqual(raw.prepare("SELECT recipe_id AS r, title FROM recipe_cooks").all().map((r) => ({ ...r })), [{ r: null, title: "チキンカレー" }]);
+});
+
+test("signed-out visitors and other households cannot reach the recipes", async () => {
+  const { browser: aki } = await setUp();
+  const curry = await (await aki.post("/api/recipes", { title: "カレー" })).json();
+  const cook = await (await aki.post(`/api/recipes/${curry.id}/cooks`, { cookedOn: "2026-10-18" })).json();
+  const anon = new Browser();
+  for (const [method, path, body] of [
+    ["GET", "/api/recipes"], ["POST", "/api/recipes", { title: "x" }], ["GET", `/api/recipes/${curry.id}`], ["PATCH", `/api/recipes/${curry.id}`, { title: "x" }],
+    ["DELETE", `/api/recipes/${curry.id}`], ["GET", `/api/recipes/${curry.id}/cooks`], ["POST", `/api/recipes/${curry.id}/cooks`, { cookedOn: "2026-10-18" }], ["DELETE", `/api/cooks/${cook.id}`],
+  ] as const) {
+    assert.equal((await anon.fetch(method, path, body)).status, 401, `${method} ${path}`);
+  }
+
+  raw.exec("INSERT INTO households (id, name, created_at) VALUES ('h2', 'Other', 0)");
+  raw.exec("INSERT INTO users (id, display_name, created_at) VALUES ('u2', 'Eve', 0)");
+  raw.exec("INSERT INTO memberships (household_id, user_id, role, created_at) VALUES ('h2', 'u2', 'admin', 0)");
+  const eve = new Browser();
+  eve.cookies.set("__Host-session", "eves-session");
+  raw.exec(`INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES ('${await sha256("eves-session")}', 'u2', 0, ${clock + 1000})`);
+  assert.deepEqual((await (await eve.get("/api/recipes")).json()).recipes, []);
+  assert.equal((await eve.get(`/api/recipes/${curry.id}`)).status, 404);
+  assert.deepEqual((await (await eve.get(`/api/recipes/${curry.id}/cooks`)).json()).cooks, []);
+  assert.equal((await eve.post(`/api/recipes/${curry.id}/cooks`, { cookedOn: "2026-10-18" })).status, 404);
+  assert.equal((await eve.delete(`/api/cooks/${cook.id}`)).status, 404);
+  assert.equal((await eve.delete(`/api/recipes/${curry.id}`)).status, 404);
+  assert.equal((await aki.get(`/api/recipes/${curry.id}`)).status, 200);
 });
 
 // --- errors ---------------------------------------------------------------------------------------------

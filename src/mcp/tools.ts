@@ -1,13 +1,17 @@
 import * as z from "zod/mini";
-import { FRIDGE_STATUSES, LISTS, NAME_MAX, NOTE_MAX, SHOPPING_STATUSES } from "../db/schema.ts";
+import { BODY_MAX, FRIDGE_STATUSES, LISTS, NAME_MAX, NOTE_MAX, SHOPPING_STATUSES, TITLE_MAX, URL_MAX } from "../db/schema.ts";
 import { eventJson, itemJson } from "../items/json.ts";
 import { ItemError, type Actor, type ItemService } from "../items/service.ts";
+import { cookJson, recipeJson } from "../recipes/json.ts";
+import { QUERY_MAX, RecipeError, type RecipeService } from "../recipes/service.ts";
 import { defineTool, type ToolDef, type ToolResult } from "./registry.ts";
 
-export type Ctx = { items: ItemService; actor: Actor };
+export type Ctx = { items: ItemService; recipes: RecipeService; actor: Actor };
 
 export const SCOPE_READ = "items:read";
 export const SCOPE_WRITE = "items:write";
+export const SCOPE_RECIPES_READ = "recipes:read";
+export const SCOPE_RECIPES_WRITE = "recipes:write";
 
 const result = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
 
@@ -131,7 +135,138 @@ const listEvents = defineTool<Ctx, any>({
   },
 });
 
-export const tools = [listItems, getItem, createItem, updateItem, deleteItem, moveItem, listEvents] as ToolDef<Ctx>[];
+// --- recipes -------------------------------------------------------------------
 
-// Only deliberate item errors are shown to the client; anything else is "Internal error".
-export const userFacingError = (error: unknown) => (error instanceof ItemError ? error.message : null);
+const RECIPE_HELP =
+  "Recipes are the household's own collection: a title with a link and/or free text (ingredients, steps, notes, as they wrote them; nothing is structured). " +
+  "The app never fetches the link.";
+const recipeId = z.string().check(z.minLength(1), z.maxLength(64), z.describe("Recipe id, as returned by list_recipes or create_recipe."));
+const date = (description: string) => z.string().check(z.regex(/^\d{4}-\d{2}-\d{2}$/), z.describe(description));
+
+const listRecipes = defineTool<Ctx, any>({
+  name: "list_recipes",
+  description:
+    "List the household's recipes, most recently changed first, with how many times each was cooked and when last (lastCookedOn). " +
+    "The text is left out unless withBody is true; use get_recipe for one. " +
+    RECIPE_HELP,
+  scope: SCOPE_RECIPES_READ,
+  annotations: { readOnlyHint: true },
+  input: z.object({
+    query: z.optional(z.string().check(z.maxLength(QUERY_MAX), z.describe("Only recipes whose title or text contains this, e.g. an ingredient."))),
+    withBody: z.optional(z.boolean().check(z.describe("Include each recipe's text, e.g. to match ingredients against the fridge. Default false."))),
+  }),
+  async handler(args, { recipes, actor }) {
+    return result({ recipes: (await recipes.list(actor, args)).map(recipeJson) });
+  },
+});
+
+const getRecipe = defineTool<Ctx, any>({
+  name: "get_recipe",
+  description: "Get one recipe with its text, link, and how often and when it was last cooked.",
+  scope: SCOPE_RECIPES_READ,
+  annotations: { readOnlyHint: true },
+  input: z.object({ id: recipeId }),
+  async handler(args, { recipes, actor }) {
+    return result(recipeJson(await recipes.get(actor, args.id)));
+  },
+});
+
+const createRecipe = defineTool<Ctx, any>({
+  name: "create_recipe",
+  description:
+    "Add a recipe. " +
+    RECIPE_HELP +
+    " When saving one from a web page, keep the link as the source and write only what the household wants to remember (their changes, a short summary); do not copy the whole page.",
+  scope: SCOPE_RECIPES_WRITE,
+  annotations: { destructiveHint: false },
+  input: z.object({
+    title: z.string().check(z.minLength(1), z.maxLength(TITLE_MAX), z.describe("The dish, e.g. チキンカレー.")),
+    url: z.optional(z.string().check(z.maxLength(URL_MAX), z.describe("Where the recipe is, http or https."))),
+    body: z.optional(z.string().check(z.maxLength(BODY_MAX), z.describe("Free text: ingredients, steps, notes."))),
+  }),
+  async handler(args, { recipes, actor }) {
+    return result(recipeJson(await recipes.create(actor, args)));
+  },
+});
+
+const updateRecipe = defineTool<Ctx, any>({
+  name: "update_recipe",
+  description: "Change a recipe's title, link or text; only the given fields change, and the new text replaces the old one entirely.",
+  scope: SCOPE_RECIPES_WRITE,
+  annotations: { destructiveHint: false },
+  input: z.object({
+    id: recipeId,
+    title: z.optional(z.string().check(z.minLength(1), z.maxLength(TITLE_MAX))),
+    url: z.optional(z.nullable(z.string().check(z.maxLength(URL_MAX))).check(z.describe("New link. null or empty removes it."))),
+    body: z.optional(z.nullable(z.string().check(z.maxLength(BODY_MAX))).check(z.describe("New text. null or empty clears it."))),
+  }),
+  async handler({ id, ...patch }, { recipes, actor }) {
+    return result(recipeJson(await recipes.update(actor, id, patch)));
+  },
+});
+
+const deleteRecipe = defineTool<Ctx, any>({
+  name: "delete_recipe",
+  description: "Delete a recipe permanently. Its cook records stay (list_cooks), under the title they were cooked as.",
+  scope: SCOPE_RECIPES_WRITE,
+  annotations: { destructiveHint: true },
+  input: z.object({ id: recipeId }),
+  async handler(args, { recipes, actor }) {
+    await recipes.delete(actor, args.id);
+    return result({ deleted: args.id });
+  },
+});
+
+const recordCook = defineTool<Ctx, any>({
+  name: "record_cook",
+  description:
+    "Record that the household cooked a recipe on a day. Several records per recipe are normal; they show what is made again and again. " +
+    "Use the household's local date (if they cooked it today, today's date where they are).",
+  scope: SCOPE_RECIPES_WRITE,
+  annotations: { destructiveHint: false },
+  input: z.object({
+    recipeId,
+    cookedOn: date("The day it was cooked, YYYY-MM-DD."),
+    note: z.optional(z.string().check(z.maxLength(NOTE_MAX), z.describe("e.g. what was changed this time, or how it turned out."))),
+  }),
+  async handler(args, { recipes, actor }) {
+    return result(cookJson(await recipes.recordCook(actor, args)));
+  },
+});
+
+const listCooks = defineTool<Ctx, any>({
+  name: "list_cooks",
+  description:
+    "What was cooked when, newest day first. Records of deleted recipes stay, with recipeId null. " +
+    "Useful for what was made recently, what is a regular, or what has not been made for a while.",
+  scope: SCOPE_RECIPES_READ,
+  annotations: { readOnlyHint: true },
+  input: z.object({
+    recipeId: z.optional(recipeId.check(z.describe("Only this recipe."))),
+    since: z.optional(date("Only days on or after this one, YYYY-MM-DD.")),
+    limit: z.optional(z.int().check(z.minimum(1), z.maximum(500), z.describe("Default 100."))),
+  }),
+  async handler(args, { recipes, actor }) {
+    return result({ cooks: (await recipes.cooks(actor, args)).map(cookJson) });
+  },
+});
+
+const deleteCook = defineTool<Ctx, any>({
+  name: "delete_cook",
+  description: "Delete one cook record, e.g. one recorded by mistake.",
+  scope: SCOPE_RECIPES_WRITE,
+  annotations: { destructiveHint: true },
+  input: z.object({ id: z.string().check(z.minLength(1), z.maxLength(64), z.describe("Cook record id, as returned by record_cook or list_cooks.")) }),
+  async handler(args, { recipes, actor }) {
+    await recipes.deleteCook(actor, args.id);
+    return result({ deleted: args.id });
+  },
+});
+
+export const tools = [
+  listItems, getItem, createItem, updateItem, deleteItem, moveItem, listEvents,
+  listRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe, recordCook, listCooks, deleteCook,
+] as ToolDef<Ctx>[];
+
+// Only deliberate item and recipe errors are shown to the client; anything else is "Internal error".
+export const userFacingError = (error: unknown) => (error instanceof ItemError || error instanceof RecipeError ? error.message : null);

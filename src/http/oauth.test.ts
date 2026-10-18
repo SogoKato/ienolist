@@ -5,6 +5,7 @@ import { createAuthService } from "../auth/service.ts";
 import { loadConfig } from "../config.ts";
 import { createTestDb } from "../db/testing.ts";
 import { createItemService } from "../items/service.ts";
+import { createRecipeService } from "../recipes/service.ts";
 import { randomToken, sha256 } from "../lib/token.ts";
 import { createOAuthService } from "../oauth/service.ts";
 import { createApp } from "./app.ts";
@@ -31,6 +32,7 @@ beforeEach(() => {
     config,
     auth: createAuthService(t.db, { rp: config.rp, now: () => clock }),
     items: createItemService(t.db, { now: () => clock }),
+    recipes: createRecipeService(t.db, { now: () => clock }),
     oauth: createOAuthService(t.db, { origin: config.origin, now: () => clock }),
   });
 });
@@ -291,7 +293,7 @@ test("connections can be listed and disconnected, which cuts the client off", as
   const { tokens } = await connect(browser);
   const { connections } = await (await browser.get("/api/connections")).json();
   assert.equal(connections.length, 1);
-  assert.deepEqual([connections[0].clientName, connections[0].scopes, connections[0].createdAt], ["Claude", ["items:read", "items:write"], clock]);
+  assert.deepEqual([connections[0].clientName, connections[0].scopes, connections[0].createdAt], ["Claude", ["items:read", "items:write", "recipes:read", "recipes:write"], clock]);
   assert.deepEqual(Object.keys(connections[0]).sort(), ["clientName", "createdAt", "id", "scopes"]);
 
   assert.equal((await browser.delete(`/api/connections/${connections[0].id}`)).status, 204);

@@ -34,6 +34,18 @@ export type List = "shopping" | "fridge";
 export type Status = "to_buy" | "bought" | "in_stock" | "used_up";
 export type Item = { id: string; list: List; status: Status; name: string; note: string | null; createdAt: string; updatedAt: string };
 
+export type Recipe = {
+  id: string;
+  title: string;
+  url: string | null;
+  body?: string | null;
+  cookCount: number;
+  lastCookedOn: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type Cook = { id: string; recipeId: string | null; title: string; cookedOn: string; note: string | null; source: "web" | "mcp"; recordedAt: string };
+
 export type Member = { id: string; displayName: string; role: Role };
 export type Passkey = { id: string; deviceName: string | null; createdAt: number; lastUsedAt: number | null };
 export type Connection = { id: string; clientName: string; scopes: string[]; createdAt: number };
