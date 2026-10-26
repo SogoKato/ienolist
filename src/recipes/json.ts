@@ -1,14 +1,18 @@
 import { iso } from "../items/json.ts";
-import type { Cook, Recipe, RecipeSummary } from "./service.ts";
+import type { Book, Cook, RecipeSummary } from "./service.ts";
 
 // The JSON shape of recipes and cook records, shared by the web API and the MCP tools.
 // Times are ISO 8601, cook dates stay YYYY-MM-DD; the household is never exposed.
-export const recipeJson = (r: Recipe | RecipeSummary) => ({
+export const recipeJson = (r: RecipeSummary) => ({
   id: r.id,
   title: r.title,
   url: r.url,
-  ...("body" in r && r.body !== undefined ? { body: r.body } : {}),
-  ...("cookCount" in r ? { cookCount: r.cookCount, lastCookedOn: r.lastCookedOn } : {}),
+  book: r.bookId === null ? null : { id: r.bookId, title: r.bookTitle },
+  page: r.page,
+  tags: r.tags,
+  ...(r.body !== undefined ? { body: r.body } : {}),
+  cookCount: r.cookCount,
+  lastCookedOn: r.lastCookedOn,
   createdAt: iso(r.createdAt),
   updatedAt: iso(r.updatedAt),
 });
@@ -22,3 +26,5 @@ export const cookJson = (c: Cook) => ({
   source: c.source,
   recordedAt: iso(c.createdAt),
 });
+
+export const bookJson = (b: Book) => ({ id: b.id, title: b.title, recipeCount: b.recipeCount, createdAt: iso(b.createdAt) });

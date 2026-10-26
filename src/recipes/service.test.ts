@@ -145,3 +145,86 @@ test("checkDate accepts real calendar dates only", () => {
   assert.throws(() => checkDate("2025-02-29"), RecipeError);
   assert.throws(() => checkDate(20261001), RecipeError);
 });
+
+test("a recipe names its book by title: an existing book is reused, a new one is added", async () => {
+  const a = await svc.create(home, { title: "唐揚げ", book: " 茅乃舎 レシピ冊子 ", page: "12" });
+  const b = await svc.create(home, { title: "肉じゃが", book: "茅乃舎 レシピ冊子", page: "3-4" });
+  const c = await svc.create(other, { title: "炒飯", book: "茅乃舎 レシピ冊子" });
+  assert.equal(a.bookTitle, "茅乃舎 レシピ冊子");
+  assert.equal(a.bookId, b.bookId);
+  assert.notEqual(a.bookId, c.bookId);
+  assert.equal(b.page, "3-4");
+  assert.deepEqual((await svc.books(home)).map((x) => [x.title, x.recipeCount]), [["茅乃舎 レシピ冊子", 2]]);
+  assert.deepEqual((await svc.list(home, { bookId: a.bookId! })).map((r) => r.title).sort(), ["唐揚げ", "肉じゃが"]);
+});
+
+test("a page needs a book, and taking the book away takes the page", async () => {
+  await rejects(svc.create(home, { title: "x", page: "12" }), "invalid", /page needs a book/);
+  const plain = await svc.create(home, { title: "x" });
+  await rejects(svc.update(home, plain.id, { page: "12" }), "invalid", /page needs a book/);
+  const r = await svc.create(home, { title: "y", book: "本", page: "12" });
+  assert.equal((await svc.update(home, r.id, { page: "13" })).page, "13");
+  const moved = await svc.update(home, r.id, { book: "別の本" });
+  assert.deepEqual([moved.bookTitle, moved.page], ["別の本", "13"]);
+  const cleared = await svc.update(home, r.id, { book: null });
+  assert.deepEqual([cleared.bookId, cleared.page], [null, null]);
+  await rejects(svc.create(home, { title: "z", book: "本", page: "x".repeat(21) }), "invalid", /page must be at most/);
+});
+
+test("tags are cleaned up, kept unique, replaced as a whole, and filter with AND", async () => {
+  const r = await svc.create(home, { title: "ラタトゥイユ", tags: [" 副菜", "#作り置き", "副菜", "夏"] });
+  assert.deepEqual(r.tags, ["作り置き", "副菜", "夏"].sort());
+  await svc.create(home, { title: "唐揚げ", tags: ["主菜", "作り置き"] });
+  await svc.create(home, { title: "味噌汁" });
+  assert.deepEqual((await svc.list(home, { tags: ["作り置き"] })).length, 2);
+  assert.deepEqual((await svc.list(home, { tags: ["作り置き", "夏"] })).map((x) => x.title), ["ラタトゥイユ"]);
+  assert.deepEqual((await svc.list(home)).find((x) => x.title === "味噌汁")!.tags, []);
+
+  const updated = await svc.update(home, r.id, { tags: ["副菜"] });
+  assert.deepEqual(updated.tags, ["副菜"]);
+  assert.deepEqual((await svc.update(home, r.id, { title: "ラタトゥイユ（改）" })).tags, ["副菜"]);
+  assert.deepEqual(await svc.tags(home), [
+    { tag: "主菜", recipeCount: 1 },
+    { tag: "作り置き", recipeCount: 1 },
+    { tag: "副菜", recipeCount: 1 },
+  ]);
+  assert.deepEqual(await svc.tags(other), []);
+
+  await rejects(svc.create(home, { title: "x", tags: ["作り 置き"] }), "invalid", /spaces or commas/);
+  await rejects(svc.create(home, { title: "x", tags: ["a、b"] }), "invalid", /spaces or commas/);
+  await rejects(svc.create(home, { title: "x", tags: ["x".repeat(31)] }), "invalid", /1-30/);
+  await rejects(svc.create(home, { title: "x", tags: Array.from({ length: 21 }, (_, i) => `t${i}`) }), "invalid", /at most 20/);
+});
+
+test("renaming a tag changes it everywhere and merges into an existing one", async () => {
+  const a = await svc.create(home, { title: "a", tags: ["鶏", "主菜"] });
+  await svc.create(home, { title: "b", tags: ["鶏肉"] });
+  await svc.create(other, { title: "c", tags: ["鶏"] });
+  assert.deepEqual(await svc.renameTag(home, "鶏", "鶏肉"), { recipeCount: 1 });
+  assert.deepEqual((await svc.get(home, a.id)).tags, ["主菜", "鶏肉"]);
+  assert.deepEqual((await svc.tags(home)).find((t) => t.tag === "鶏肉")?.recipeCount, 2);
+  assert.deepEqual((await svc.tags(other)).map((t) => t.tag), ["鶏"]);
+  await rejects(svc.renameTag(home, "鶏", "x"), "not_found");
+  await rejects(svc.renameTag(home, "鶏肉", "#鶏肉"), "invalid", /same/);
+});
+
+test("books can be renamed and deleted, and only the household's own", async () => {
+  const r = await svc.create(home, { title: "a", book: "本A", page: "1" });
+  await svc.create(home, { title: "b", book: "本B" });
+  await svc.renameBook(home, r.bookId!, "本A 改訂版");
+  assert.equal((await svc.get(home, r.id)).bookTitle, "本A 改訂版");
+  await rejects(svc.renameBook(home, r.bookId!, "本B"), "invalid", /already a book/);
+  await rejects(svc.renameBook(other, r.bookId!, "x"), "not_found");
+  await rejects(svc.deleteBook(other, r.bookId!), "not_found");
+  await svc.deleteBook(home, r.bookId!);
+  const after = await svc.get(home, r.id);
+  assert.deepEqual([after.bookId, after.page], [null, null]);
+  assert.deepEqual((await svc.books(home)).map((b) => b.title), ["本B"]);
+});
+
+test("another household's recipe cannot be given tags or a book", async () => {
+  const mine = await svc.create(home, { title: "a" });
+  await rejects(svc.update(other, mine.id, { tags: ["x"], book: "本" }), "not_found");
+  assert.deepEqual((await svc.get(home, mine.id)).tags, []);
+  assert.deepEqual(await svc.books(other), []);
+});

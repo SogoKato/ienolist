@@ -134,6 +134,25 @@ try {
     await call(tokens.access_token, "delete_cook", { id: cook.id });
   });
 
+  // Books and tags: the batch that adds a book and tags and reads the recipe back, the JSON
+  // aggregate of tags, INSERT ... SELECT for renaming a tag, and a deleted book leaving its recipes.
+  await step("books and tags over MCP", async () => {
+    const a = await call(tokens.access_token, "create_recipe", { title: "唐揚げ", book: "茅乃舎 レシピ冊子", page: "12", tags: ["主菜", "揚げ物"] });
+    assert.deepEqual([a.book.title, a.page, a.tags], ["茅乃舎 レシピ冊子", "12", ["主菜", "揚げ物"]]);
+    const b = await call(tokens.access_token, "create_recipe", { title: "ラタトゥイユ", book: "茅乃舎 レシピ冊子", tags: ["副菜", "作りおき"] });
+    assert.equal(b.book.id, a.book.id);
+    await call(tokens.access_token, "rename_tag", { from: "作りおき", to: "作り置き" });
+    const updated = await call(tokens.access_token, "update_recipe", { id: a.id, tags: ["主菜", "作り置き"] });
+    assert.deepEqual(updated.tags, ["主菜", "作り置き"].sort());
+    const tagged = (await call(tokens.access_token, "list_recipes", { tags: ["作り置き"], bookId: a.book.id })).recipes;
+    assert.equal(tagged.length, 2);
+    assert.deepEqual((await call(tokens.access_token, "list_tags")).tags.map((t: { tag: string }) => t.tag).sort(), ["主菜", "作り置き", "副菜"].sort());
+    await call(tokens.access_token, "delete_book", { id: a.book.id });
+    assert.equal((await call(tokens.access_token, "get_recipe", { id: a.id })).book, null);
+    await call(tokens.access_token, "delete_recipe", { id: a.id });
+    await call(tokens.access_token, "delete_recipe", { id: b.id });
+  });
+
   const refreshed = await step("refresh the token", async () => {
     const res = await client("POST", "/oauth/token", {
       headers: { "content-type": "application/x-www-form-urlencoded" },

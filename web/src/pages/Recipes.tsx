@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useLocation } from "wouter";
-import { api, type Cook, type Recipe } from "../api";
+import { Link, useLocation, useSearch } from "wouter";
+import { api, type Book, type Cook, type Recipe, type Tag } from "../api";
 import { localDate, shortDate } from "../dates";
 import { MainHeader, MainTabs } from "../nav";
+import { parseTags } from "../tags";
 import { describeError } from "../passkeys";
 import { ErrorText, Page } from "../ui";
 
@@ -16,20 +17,69 @@ const hostOf = (url: string) => {
   }
 };
 
+// 42 -> p.42; anything else (e.g. 巻末) as written.
+const pageText = (page: string) => (/^\d/.test(page) ? `p.${page}` : page);
+const bookText = (book: { title: string }, page: string | null) => `『${book.title}』${page ? ` ${pageText(page)}` : ""}`;
+const sourceText = (r: Recipe) => (r.book ? bookText(r.book, r.page) : r.url ? hostOf(r.url) : null);
+
+// The collection's filters live in the address (?tag=…&tag=…&book=…), so the back button keeps them.
+function filterPath(tags: string[], book: string) {
+  const params = new URLSearchParams();
+  for (const tag of tags) params.append("tag", tag);
+  if (book) params.set("book", book);
+  const query = params.toString();
+  return `/recipes${query ? `?${query}` : ""}`;
+}
+
+function Tags({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <span className="tags">
+      {tags.map((t) => (
+        <span key={t} className="tag">
+          {t}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // --- the collection --------------------------------------------------------------------
 
 export function Recipes() {
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const params = new URLSearchParams(search);
+  const selectedTags = params.getAll("tag");
+  const bookId = params.get("book") ?? "";
   const [query, setQuery] = useState("");
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [error, setError] = useState("");
 
-  // Searches as the person types, a moment after they stop.
+  const loadGroups = useCallback(async () => {
+    try {
+      const [t, b] = await Promise.all([api.get<{ tags: Tag[] }>("/api/tags"), api.get<{ books: Book[] }>("/api/books")]);
+      setTags(t.tags);
+      setBooks(b.books);
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }, []);
+  useEffect(() => {
+    loadGroups();
+  }, [loadGroups]);
+
+  // Searches as the person types, a moment after they stop; filters apply at once.
   useEffect(() => {
     let stale = false;
     const timer = setTimeout(async () => {
       try {
+        const p = new URLSearchParams(search);
         const q = query.trim();
-        const found = (await api.get<{ recipes: Recipe[] }>(`/api/recipes${q ? `?q=${encodeURIComponent(q)}` : ""}`)).recipes;
+        if (q) p.set("q", q);
+        const found = (await api.get<{ recipes: Recipe[] }>(`/api/recipes${p.size ? `?${p}` : ""}`)).recipes;
         if (!stale) setRecipes(found);
       } catch (e) {
         if (!stale) setError(describeError(e));
@@ -39,7 +89,37 @@ export function Recipes() {
       stale = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, search]);
+
+  const toggleTag = (tag: string) =>
+    navigate(filterPath(selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag], bookId), { replace: true });
+  const book = books.find((b) => b.id === bookId);
+  // Tags in the address that no recipe has any more still show, so they can be switched off.
+  const tagNames = [...tags.map((t) => t.tag), ...selectedTags.filter((t) => !tags.some((x) => x.tag === t))];
+  const filtered = selectedTags.length > 0 || bookId !== "";
+
+  async function renameBook(b: Book) {
+    const title = prompt("本の名前", b.title)?.trim();
+    if (!title || title === b.title) return;
+    try {
+      await api.patch(`/api/books/${b.id}`, { title });
+      await loadGroups();
+      navigate(filterPath(selectedTags, bookId), { replace: true });
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
+  async function deleteBook(b: Book) {
+    if (!confirm(`「${b.title}」を削除しますか？レシピは残り、本とページの情報だけが消えます。`)) return;
+    try {
+      await api.delete(`/api/books/${b.id}`);
+      await loadGroups();
+      navigate(filterPath(selectedTags, ""), { replace: true });
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
 
   return (
     <main className="page">
@@ -52,23 +132,62 @@ export function Recipes() {
           追加
         </Link>
       </div>
+
+      {books.length > 0 && (
+        <div className="add">
+          <select value={bookId} onChange={(e) => navigate(filterPath(selectedTags, e.target.value), { replace: true })} aria-label="本で絞る">
+            <option value="">すべての本・サイト</option>
+            {books.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.title}（{b.recipeCount}）
+              </option>
+            ))}
+          </select>
+          {book && (
+            <details className="menu">
+              <summary aria-label="本の操作">⋯</summary>
+              <div className="menu-items">
+                <button onClick={() => renameBook(book)}>名前を変える</button>
+                <button className="danger" onClick={() => deleteBook(book)}>
+                  本を削除
+                </button>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+      {tagNames.length > 0 && (
+        <div className="chips" role="group" aria-label="タグで絞る">
+          {tagNames.map((t) => (
+            <button key={t} className="chip" aria-pressed={selectedTags.includes(t)} onClick={() => toggleTag(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
       <ErrorText>{error}</ErrorText>
 
       {recipes === null && !error && <p className="muted center">読み込み中…</p>}
-      {recipes !== null && recipes.length === 0 && <p className="muted center">{query.trim() ? "見つかりませんでした。" : "まだレシピがありません。"}</p>}
+      {recipes !== null && recipes.length === 0 && (
+        <p className="muted center">{query.trim() || filtered ? "見つかりませんでした。" : "まだレシピがありません。"}</p>
+      )}
 
       <ul className="items">
-        {(recipes ?? []).map((r) => (
-          <li key={r.id} className="item">
-            <Link href={`/recipes/${r.id}`} className="recipe-link">
-              <span className="name">{r.title}</span>
-              <span className="note">
-                {cookedText(r)}
-                {r.url && ` ・ ${hostOf(r.url)}`}
-              </span>
-            </Link>
-          </li>
-        ))}
+        {(recipes ?? []).map((r) => {
+          const source = sourceText(r);
+          return (
+            <li key={r.id} className="item">
+              <Link href={`/recipes/${r.id}`} className="recipe-link">
+                <span className="name">{r.title}</span>
+                <span className="note">
+                  {cookedText(r)}
+                  {source && ` ・ ${source}`}
+                </span>
+                <Tags tags={r.tags} />
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </main>
   );
@@ -76,12 +195,27 @@ export function Recipes() {
 
 // --- adding and editing ------------------------------------------------------------------
 
-type Fields = { title: string; url: string; body: string };
+type Fields = { title: string; url: string; body: string; book: string; page: string; tags: string };
 
 function RecipeForm({ initial, submitLabel, onSubmit, onCancel }: { initial: Fields; submitLabel: string; onSubmit(fields: Fields): Promise<void>; onCancel(): void }) {
   const [fields, setFields] = useState(initial);
   const [busy, setBusy] = useState(false);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [known, setKnown] = useState<Tag[]>([]);
   const set = (key: keyof Fields) => (e: { target: { value: string } }) => setFields((f) => ({ ...f, [key]: e.target.value }));
+
+  // Existing books and tags, to pick from rather than retype (and misspell).
+  useEffect(() => {
+    api.get<{ books: Book[] }>("/api/books").then((r) => setBooks(r.books), () => {});
+    api.get<{ tags: Tag[] }>("/api/tags").then((r) => setKnown(r.tags), () => {});
+  }, []);
+
+  const chosen = parseTags(fields.tags);
+  const toggle = (tag: string) =>
+    setFields((f) => {
+      const now = parseTags(f.tags);
+      return { ...f, tags: (now.includes(tag) ? now.filter((t) => t !== tag) : [...now, tag]).join(" ") };
+    });
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -103,6 +237,34 @@ function RecipeForm({ initial, submitLabel, onSubmit, onCancel }: { initial: Fie
         レシピの URL（任意）
         <input type="url" value={fields.url} onChange={set("url")} placeholder="https://" maxLength={2000} />
       </label>
+      <div className="add">
+        <label className="grow">
+          本・冊子（任意）
+          <input value={fields.book} onChange={set("book")} list="books" maxLength={200} autoComplete="off" />
+          <datalist id="books">
+            {books.map((b) => (
+              <option key={b.id} value={b.title} />
+            ))}
+          </datalist>
+        </label>
+        <label className="page-field">
+          ページ
+          <input value={fields.page} onChange={set("page")} inputMode="numeric" maxLength={20} disabled={!fields.book.trim()} />
+        </label>
+      </div>
+      <label>
+        タグ（スペース区切り。任意）
+        <input value={fields.tags} onChange={set("tags")} placeholder="主菜 時短 作り置き" autoComplete="off" />
+      </label>
+      {known.length > 0 && (
+        <div className="chips" role="group" aria-label="使っているタグ">
+          {known.map(({ tag }) => (
+            <button type="button" key={tag} className="chip" aria-pressed={chosen.includes(tag)} onClick={() => toggle(tag)}>
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
       <label>
         メモ（材料、手順、変えたところなど。任意）
         <textarea value={fields.body} onChange={set("body")} rows={10} maxLength={20000} />
@@ -119,7 +281,11 @@ function RecipeForm({ initial, submitLabel, onSubmit, onCancel }: { initial: Fie
   );
 }
 
-const payload = (f: Fields) => ({ title: f.title, url: f.url.trim() || null, body: f.body.trim() || null });
+const payload = (f: Fields) => {
+  const book = f.book.trim() || null;
+  return { title: f.title, url: f.url.trim() || null, body: f.body.trim() || null, book, page: book ? f.page.trim() || null : null, tags: parseTags(f.tags) };
+};
+const EMPTY: Fields = { title: "", url: "", body: "", book: "", page: "", tags: "" };
 
 export function NewRecipe() {
   const [, navigate] = useLocation();
@@ -128,7 +294,7 @@ export function NewRecipe() {
     <Page title="レシピを追加" actions={<Link href="/recipes">レシピへ</Link>}>
       <ErrorText>{error}</ErrorText>
       <RecipeForm
-        initial={{ title: "", url: "", body: "" }}
+        initial={EMPTY}
         submitLabel="追加"
         onCancel={() => navigate("/recipes")}
         onSubmit={async (fields) => {
@@ -192,7 +358,7 @@ export function RecipeDetail({ id }: { id: string }) {
       <Page title="レシピを編集" actions={<Link href="/recipes">レシピへ</Link>}>
         <ErrorText>{error}</ErrorText>
         <RecipeForm
-          initial={{ title: recipe.title, url: recipe.url ?? "", body: recipe.body ?? "" }}
+          initial={{ title: recipe.title, url: recipe.url ?? "", body: recipe.body ?? "", book: recipe.book?.title ?? "", page: recipe.page ?? "", tags: recipe.tags.join(" ") }}
           submitLabel="保存"
           onCancel={() => setEditing(false)}
           onSubmit={(fields) =>
@@ -209,6 +375,21 @@ export function RecipeDetail({ id }: { id: string }) {
 
   return (
     <Page title={recipe.title} actions={<Link href="/recipes">レシピへ</Link>}>
+      {recipe.book && (
+        <p>
+          <Link href={filterPath([], recipe.book.id)}>『{recipe.book.title}』</Link>
+          {recipe.page && ` ${pageText(recipe.page)}`}
+        </p>
+      )}
+      {recipe.tags.length > 0 && (
+        <p className="tags">
+          {recipe.tags.map((t) => (
+            <Link key={t} href={filterPath([t], "")} className="tag">
+              {t}
+            </Link>
+          ))}
+        </p>
+      )}
       {recipe.url && (
         <p>
           <a href={recipe.url} target="_blank" rel="noopener noreferrer">

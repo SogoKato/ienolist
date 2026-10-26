@@ -368,6 +368,7 @@ test("signed-out visitors and other households cannot reach the recipes", async 
   for (const [method, path, body] of [
     ["GET", "/api/recipes"], ["POST", "/api/recipes", { title: "x" }], ["GET", `/api/recipes/${curry.id}`], ["PATCH", `/api/recipes/${curry.id}`, { title: "x" }],
     ["DELETE", `/api/recipes/${curry.id}`], ["GET", `/api/recipes/${curry.id}/cooks`], ["POST", `/api/recipes/${curry.id}/cooks`, { cookedOn: "2026-10-18" }], ["DELETE", `/api/cooks/${cook.id}`],
+    ["GET", "/api/books"], ["PATCH", "/api/books/b", { title: "x" }], ["DELETE", "/api/books/b"], ["GET", "/api/tags"],
   ] as const) {
     assert.equal((await anon.fetch(method, path, body)).status, 401, `${method} ${path}`);
   }
@@ -385,6 +386,25 @@ test("signed-out visitors and other households cannot reach the recipes", async 
   assert.equal((await eve.delete(`/api/cooks/${cook.id}`)).status, 404);
   assert.equal((await eve.delete(`/api/recipes/${curry.id}`)).status, 404);
   assert.equal((await aki.get(`/api/recipes/${curry.id}`)).status, 200);
+});
+
+test("recipes come from a book and page, carry tags, and filter by both", async () => {
+  const { browser } = await setUp();
+  const r = await (await browser.post("/api/recipes", { title: "唐揚げ", book: "茅乃舎 レシピ冊子", page: "12", tags: ["主菜", "揚げ物"] })).json();
+  assert.deepEqual([r.book.title, r.page, r.tags], ["茅乃舎 レシピ冊子", "12", ["主菜", "揚げ物"]]);
+  await browser.post("/api/recipes", { title: "ラタトゥイユ", tags: ["副菜", "作り置き"] });
+  const titles = async (query: string) => (await (await browser.get(`/api/recipes?${query}`)).json()).recipes.map((x: { title: string }) => x.title);
+  assert.deepEqual(await titles(`book=${r.book.id}`), ["唐揚げ"]);
+  assert.deepEqual(await titles(new URLSearchParams([["tag", "主菜"], ["tag", "揚げ物"]]).toString()), ["唐揚げ"]);
+  assert.deepEqual(await titles(new URLSearchParams([["tag", "主菜"], ["tag", "作り置き"]]).toString()), []);
+  assert.equal((await browser.post("/api/recipes", { title: "x", tags: ["a b"] })).status, 400);
+
+  assert.deepEqual((await (await browser.get("/api/tags")).json()).tags.map((t: { tag: string }) => t.tag).length, 4);
+  assert.equal((await browser.patch(`/api/books/${r.book.id}`, { title: "茅乃舎の本" })).status, 204);
+  assert.deepEqual((await (await browser.get("/api/books")).json()).books.map((b: { title: string; recipeCount: number }) => [b.title, b.recipeCount]), [["茅乃舎の本", 1]]);
+  assert.equal((await browser.delete(`/api/books/${r.book.id}`)).status, 204);
+  const after = await (await browser.get(`/api/recipes/${r.id}`)).json();
+  assert.deepEqual([after.book, after.page, after.tags], [null, null, ["主菜", "揚げ物"]]);
 });
 
 // --- errors ---------------------------------------------------------------------------------------------

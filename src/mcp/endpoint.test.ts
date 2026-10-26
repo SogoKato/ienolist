@@ -69,6 +69,7 @@ test("modern: server/discover and tools/list", async () => {
   assert.deepEqual(list.tools.map((t: { name: string }) => t.name), [
     "list_items", "get_item", "create_item", "update_item", "delete_item", "move_item", "list_events",
     "list_recipes", "get_recipe", "create_recipe", "update_recipe", "delete_recipe", "record_cook", "list_cooks", "delete_cook",
+    "list_tags", "rename_tag", "list_books", "rename_book", "delete_book",
   ]);
   const byName = Object.fromEntries(list.tools.map((t: { name: string }) => [t.name, t]));
   assert.deepEqual(byName.list_items.annotations, { readOnlyHint: true });
@@ -91,7 +92,7 @@ test("legacy: initialize, notifications and tools/list without resultType", asyn
   assert.equal((await post({ jsonrpc: "2.0", method: "notifications/initialized" })).status, 202);
   const list = (await (await post(rpc(2, "tools/list"))).json()).result;
   assert.equal(list.resultType, undefined);
-  assert.equal(list.tools.length, 15);
+  assert.equal(list.tools.length, 20);
 });
 
 test("modern protocol errors", async () => {
@@ -306,6 +307,29 @@ test("recipes: bad dates and links come back as errors the model can fix", async
   assert.deepEqual([badUrl.isError, badUrl.content[0].text], [true, "url must be an http or https URL"]);
 });
 
+test("recipes: from a book photo, with tags, then tidied up", async () => {
+  const a = data(await modernCall("create_recipe", { title: "唐揚げ", book: "茅乃舎 レシピ冊子", page: "12", tags: ["主菜", "揚げ物"], body: "鶏もも肉 300g" }));
+  assert.deepEqual([a.book.title, a.page, a.tags], ["茅乃舎 レシピ冊子", "12", ["主菜", "揚げ物"]]);
+  const b = data(await modernCall("create_recipe", { title: "ラタトゥイユ", book: "茅乃舎 レシピ冊子", page: "20", tags: ["副菜", "作りおき"] }));
+  assert.equal(b.book.id, a.book.id);
+
+  assert.deepEqual(data(await modernCall("list_books")).books.map((x: { title: string; recipeCount: number }) => [x.title, x.recipeCount]), [["茅乃舎 レシピ冊子", 2]]);
+  assert.deepEqual(data(await modernCall("rename_tag", { from: "作りおき", to: "作り置き" })), { from: "作りおき", to: "作り置き", recipeCount: 1 });
+  assert.deepEqual(data(await modernCall("list_recipes", { tags: ["作り置き"] })).recipes.map((r: { title: string }) => r.title), ["ラタトゥイユ"]);
+  assert.deepEqual(data(await modernCall("list_recipes", { bookId: a.book.id })).recipes.length, 2);
+  assert.equal(data(await modernCall("list_tags")).tags.length, 4);
+
+  // Adding a tag means giving the current ones too.
+  assert.deepEqual(data(await modernCall("update_recipe", { id: a.id, tags: [...a.tags, "弁当"] })).tags, ["主菜", "弁当", "揚げ物"].sort());
+  const bad = await modernCall("update_recipe", { id: a.id, tags: ["作り 置き"] });
+  assert.deepEqual([bad.isError, bad.content[0].text], [true, "a tag must not contain spaces or commas: 作り 置き"]);
+
+  assert.deepEqual(data(await modernCall("rename_book", { id: a.book.id, title: "茅乃舎の冊子" })), { id: a.book.id, title: "茅乃舎の冊子" });
+  assert.equal(data(await modernCall("get_recipe", { id: b.id })).book.title, "茅乃舎の冊子");
+  assert.deepEqual(data(await modernCall("delete_book", { id: a.book.id })), { deleted: a.book.id });
+  assert.deepEqual(data(await modernCall("get_recipe", { id: a.id })).book, null);
+});
+
 test("scopes: a token for the lists alone cannot reach the recipes, and recipes:read cannot write", async () => {
   const curry = data(await modernCall("create_recipe", { title: "カレー" }));
   // What claude.ai and ChatGPT hold from before recipes existed.
@@ -319,6 +343,7 @@ test("scopes: a token for the lists alone cannot reach the recipes, and recipes:
   for (const [name, args] of [
     ["create_recipe", { title: "x" }], ["update_recipe", { id: curry.id, title: "x" }], ["delete_recipe", { id: curry.id }],
     ["record_cook", { recipeId: curry.id, cookedOn: "2026-10-18" }], ["delete_cook", { id: "x" }],
+    ["rename_tag", { from: "a", to: "b" }], ["rename_book", { id: "x", title: "y" }], ["delete_book", { id: "x" }],
   ] as const) {
     const r = await modernCall(name, args);
     assert.deepEqual([r.isError, r.content[0].text], [true, "Missing scope: recipes:write"], name);

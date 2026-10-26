@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Ids are ULIDs; times are Unix seconds. See docs/design.md.
 // Foreign keys need PRAGMA foreign_keys = ON on plain SQLite (D1 enforces them).
@@ -17,6 +17,9 @@ export const NOTE_MAX = 2000;
 export const TITLE_MAX = 200;
 export const URL_MAX = 2000;
 export const BODY_MAX = 20000;
+export const PAGE_MAX = 20;
+export const TAG_MAX = 30;
+export const TAGS_PER_RECIPE = 20;
 
 const quoted = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(", "));
 
@@ -210,7 +213,24 @@ export const itemEvents = sqliteTable(
 
 // --- recipes and when they were cooked ---------------------------------------
 
-// A link and/or free text. Nothing is fetched from the URL on the server.
+// A book (or booklet, magazine) recipes come from. Recipes point at it with a page, so the
+// household can see what they took from one book and go back to the page.
+export const books = sqliteTable(
+  "books",
+  {
+    id: text("id").primaryKey(),
+    householdId: text("household_id").notNull().references(() => households.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("books_household_title").on(t.householdId, t.title),
+    check("books_title_length", sql`length(${t.title}) BETWEEN 1 AND ${sql.raw(String(TITLE_MAX))}`),
+  ],
+);
+
+// A link and/or free text, and where it came from: the link, or a book and page.
+// Nothing is fetched from the URL on the server.
 export const recipes = sqliteTable(
   "recipes",
   {
@@ -219,11 +239,15 @@ export const recipes = sqliteTable(
     title: text("title").notNull(),
     url: text("url"),
     body: text("body"),
+    // Length checked by the service: a CHECK added to an existing table means rebuilding it.
+    bookId: text("book_id").references(() => books.id, { onDelete: "set null" }),
+    page: text("page"),
     addedBy: text("added_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [
+    index("recipes_book").on(t.bookId),
     index("recipes_household_updated").on(t.householdId, t.updatedAt),
     check("recipes_title_length", sql`length(${t.title}) BETWEEN 1 AND ${sql.raw(String(TITLE_MAX))}`),
     check(
@@ -231,6 +255,21 @@ export const recipes = sqliteTable(
       sql`${t.url} IS NULL OR (length(${t.url}) <= ${sql.raw(String(URL_MAX))} AND (${t.url} LIKE 'https://%' OR ${t.url} LIKE 'http://%'))`,
     ),
     check("recipes_body_length", sql`${t.body} IS NULL OR length(${t.body}) <= ${sql.raw(String(BODY_MAX))}`),
+  ],
+);
+
+// Free labels, e.g. 主菜, 作り置き, 冬. A tag exists while some recipe has it.
+export const recipeTags = sqliteTable(
+  "recipe_tags",
+  {
+    recipeId: text("recipe_id").notNull().references(() => recipes.id, { onDelete: "cascade" }),
+    householdId: text("household_id").notNull().references(() => households.id, { onDelete: "cascade" }),
+    tag: text("tag").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.recipeId, t.tag] }),
+    index("recipe_tags_household_tag").on(t.householdId, t.tag),
+    check("recipe_tags_tag_length", sql`length(${t.tag}) BETWEEN 1 AND ${sql.raw(String(TAG_MAX))}`),
   ],
 );
 

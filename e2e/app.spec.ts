@@ -167,6 +167,47 @@ test("a recipe is added with a link and notes, found by an ingredient, cooked to
   await expect(aki.getByRole("tab", { name: /冷蔵庫/ })).toHaveAttribute("aria-selected", "true");
 });
 
+test("recipes from a book carry its page and tags, and the collection filters by tag and book", async () => {
+  await aki.goto("/recipes/new");
+  await aki.getByLabel("料理名").fill("唐揚げ");
+  await aki.getByLabel("本・冊子（任意）").fill("茅乃舎 レシピ冊子");
+  await aki.getByLabel("ページ").fill("12");
+  await aki.getByLabel(/^タグ/).fill("主菜 揚げ物");
+  await aki.getByRole("button", { name: "追加", exact: true }).click();
+  await expect(aki.getByRole("heading", { name: "唐揚げ" })).toBeVisible();
+  await expect(aki.getByText("p.12")).toBeVisible();
+
+  // The second one reuses the book and a tag by picking them, not by retyping.
+  await aki.goto("/recipes/new");
+  await aki.getByLabel("料理名").fill("ラタトゥイユ");
+  await aki.getByLabel("本・冊子（任意）").fill("茅乃舎 レシピ冊子");
+  await aki.getByRole("group", { name: "使っているタグ" }).getByRole("button", { name: "主菜" }).click();
+  await expect(aki.getByLabel(/^タグ/)).toHaveValue("主菜");
+  await aki.getByRole("group", { name: "使っているタグ" }).getByRole("button", { name: "主菜" }).click();
+  await aki.getByLabel(/^タグ/).fill("副菜、作り置き");
+  await aki.getByRole("button", { name: "追加", exact: true }).click();
+  await expect(aki.getByRole("heading", { name: "ラタトゥイユ" })).toBeVisible();
+
+  // A tag on the recipe leads to the collection filtered by it.
+  await aki.getByRole("link", { name: "作り置き" }).click();
+  await expect(aki).toHaveURL(/\/recipes\?tag=/);
+  const list = aki.getByRole("list").filter({ has: aki.getByRole("link") });
+  await expect(list.getByRole("link")).toHaveCount(1);
+  await expect(list.getByRole("link", { name: /ラタトゥイユ/ })).toBeVisible();
+
+  const tags = aki.getByRole("group", { name: "タグで絞る" });
+  await tags.getByRole("button", { name: "作り置き" }).click();
+  await expect(list.getByRole("link")).toHaveCount(3);
+  await aki.getByLabel("本で絞る").selectOption({ label: "茅乃舎 レシピ冊子（2）" });
+  await expect(list.getByRole("link")).toHaveCount(2);
+  await tags.getByRole("button", { name: "主菜" }).click();
+  await expect(list.getByRole("link")).toHaveCount(1);
+  await expect(list.getByRole("link", { name: /唐揚げ.*『茅乃舎 レシピ冊子』 p\.12/ })).toBeVisible();
+  await aki.reload();
+  await expect(tags.getByRole("button", { name: "主菜" })).toHaveAttribute("aria-pressed", "true");
+  await expect(list.getByRole("link")).toHaveCount(1);
+});
+
 test.describe("connecting an assistant", () => {
   const redirect = "https://claude.ai/api/mcp/auth_callback";
   let clientId = "";

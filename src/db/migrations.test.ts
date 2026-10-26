@@ -168,8 +168,8 @@ test("item events keep a reference to deleted items and to users who are gone", 
 test("the migrations leave only the tables the schema declares", () => {
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name);
   assert.deepEqual(tables, [
-    "app_meta", "challenges", "households", "invites", "item_events", "items", "memberships",
-    "oauth_clients", "oauth_codes", "oauth_tokens", "passkeys", "recipe_cooks", "recipes", "sessions", "users",
+    "app_meta", "books", "challenges", "households", "invites", "item_events", "items", "memberships",
+    "oauth_clients", "oauth_codes", "oauth_tokens", "passkeys", "recipe_cooks", "recipe_tags", "recipes", "sessions", "users",
   ]);
 });
 
@@ -194,4 +194,25 @@ test("cook records outlive their recipe and go away with the household", () => {
   assert.equal(db.prepare("SELECT recipe_id AS r FROM recipe_cooks WHERE id = 'c1'").get()!.r, null);
   db.exec("DELETE FROM households WHERE id = 'h1'");
   assert.equal(count("recipe_cooks"), 0);
+});
+
+test("a deleted book leaves its recipes, and titles are unique per household", () => {
+  db.exec("INSERT INTO books (id, household_id, title, created_at) VALUES ('b1', 'h1', 'Book', 0), ('b2', 'h2', 'Book', 0)");
+  assert.throws(() => db.exec("INSERT INTO books (id, household_id, title, created_at) VALUES ('b3', 'h1', 'Book', 0)"), /UNIQUE/);
+  assert.throws(() => db.exec("INSERT INTO books (id, household_id, title, created_at) VALUES ('b4', 'h1', '', 0)"), /books_title_length/);
+  addRecipe("r1");
+  db.exec("UPDATE recipes SET book_id = 'b1', page = '42' WHERE id = 'r1'");
+  assert.throws(() => db.exec("UPDATE recipes SET book_id = 'nope' WHERE id = 'r1'"), /FOREIGN KEY/);
+  db.exec("DELETE FROM books WHERE id = 'b1'");
+  assert.equal(db.prepare("SELECT book_id AS b FROM recipes WHERE id = 'r1'").get()!.b, null);
+});
+
+test("tags are unique per recipe and go away with it", () => {
+  addRecipe("r1");
+  db.exec("INSERT INTO recipe_tags (recipe_id, household_id, tag) VALUES ('r1', 'h1', '主菜'), ('r1', 'h1', '冬')");
+  assert.throws(() => db.exec("INSERT INTO recipe_tags (recipe_id, household_id, tag) VALUES ('r1', 'h1', '主菜')"), /UNIQUE|PRIMARY KEY/);
+  assert.throws(() => db.exec("INSERT INTO recipe_tags (recipe_id, household_id, tag) VALUES ('r1', 'h1', '')"), /recipe_tags_tag_length/);
+  assert.throws(() => db.exec("INSERT INTO recipe_tags (recipe_id, household_id, tag) VALUES ('nope', 'h1', 'x')"), /FOREIGN KEY/);
+  db.exec("DELETE FROM recipes WHERE id = 'r1'");
+  assert.equal(count("recipe_tags"), 0);
 });

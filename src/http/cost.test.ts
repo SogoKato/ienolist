@@ -78,6 +78,12 @@ test("an assistant's call is one lookup for the token plus the work", async () =
   assert.equal(await cost(() => mcp("list_recipes", { withBody: true })), 2);
   assert.equal(await cost(() => mcp("get_recipe", { id: recipe.id })), 2);
   assert.equal(await cost(() => mcp("record_cook", { recipeId: recipe.id, cookedOn: "2026-10-18" })), 3);
+  // The book, the recipe, its tags and reading it back go in one batch.
+  assert.equal(await cost(() => mcp("create_recipe", { title: "唐揚げ", book: "本", page: "12", tags: ["主菜", "揚げ物"] })), 5);
+  // A change first reads the recipe: it must be the household's before its tags are touched.
+  assert.equal(await cost(() => mcp("update_recipe", { id: recipe.id, tags: ["主菜"] })), 6);
+  assert.equal(await cost(() => mcp("list_tags")), 2);
+  assert.equal(await cost(() => mcp("list_books")), 2);
 });
 
 test("the consent decision does not sweep the database one table at a time", async () => {

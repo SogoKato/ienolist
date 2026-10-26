@@ -38,12 +38,17 @@ export type Recipe = {
   id: string;
   title: string;
   url: string | null;
+  book: { id: string; title: string } | null;
+  page: string | null;
+  tags: string[];
   body?: string | null;
   cookCount: number;
   lastCookedOn: string | null;
   createdAt: string;
   updatedAt: string;
 };
+export type Book = { id: string; title: string; recipeCount: number };
+export type Tag = { tag: string; recipeCount: number };
 export type Cook = { id: string; recipeId: string | null; title: string; cookedOn: string; note: string | null; source: "web" | "mcp"; recordedAt: string };
 
 export type Member = { id: string; displayName: string; role: Role };
