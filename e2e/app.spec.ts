@@ -18,6 +18,17 @@ async function person(browser: Browser) {
   return { context, page };
 }
 
+// A finger dragging down from the top of the page and letting go. The session is left open:
+// detaching it also took the page's virtual passkey away.
+async function pullDown(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", y?: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: y === undefined ? [] : [{ x: 200, y }] });
+  await touch("touchStart", 200);
+  for (let y = 220; y <= 400; y += 20) await touch("touchMove", y);
+  await touch("touchEnd");
+}
+
 let aki: Page;
 let ben: Page;
 let inviteUrl = "";
@@ -118,13 +129,20 @@ test("an invited family member joins on their own device and sees the same lists
   await expect(aki.getByRole("button", { name: "パスキー再登録のリンク" })).toHaveCount(1);
 });
 
-test("a change made on one device is there on the other", async () => {
+test("a change made on one device shows on the other after a tap on the current tab or a pull", async () => {
+  await aki.getByRole("link", { name: "リストへ" }).click();
+  await expect(aki.getByText("読み込み中…")).toHaveCount(0);
   await ben.goto("/");
   await ben.getByRole("tab", { name: /買い物/ }).click();
   await addItem(ben, "買うものを追加", "パン");
-  await aki.getByRole("link", { name: "リストへ" }).click();
-  await aki.reload();
+  await expect(aki.getByText("パン")).toHaveCount(0);
+  await aki.getByRole("tab", { name: /買い物/ }).click();
   await expect(aki.getByText("パン")).toBeVisible();
+  await expect(aki).toHaveURL(/\/$/);
+
+  await addItem(ben, "買うものを追加", "バター");
+  await pullDown(aki);
+  await expect(aki.getByText("バター")).toBeVisible();
 });
 
 test("a recipe is added with a link and notes, found by an ingredient, cooked today, and edited", async () => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useSearch } from "wouter";
 import { api, type Item, type List } from "../api";
-import { MainHeader, MainTabs } from "../nav";
+import { MainTop } from "../nav";
 import { describeError } from "../passkeys";
 import { ErrorText } from "../ui";
 
@@ -58,18 +58,24 @@ export function Lists() {
 
   return (
     <main className="page">
-      <MainHeader />
-      <MainTabs active={list} counts={Object.fromEntries((Object.keys(LISTS) as List[]).map((key) => [key, (items ?? []).filter((i) => i.list === key && i.status === LISTS[key].open).length]))} />
-
-      <AddForm
-        placeholder={config.placeholder}
-        onAdd={(name) =>
-          run(async () => {
-            const created = await api.post<Item>("/api/items", { list, name });
-            setItems((current) => [...(current ?? []), created]);
-          })
-        }
-      />
+      <MainTop
+        active={list}
+        counts={Object.fromEntries((Object.keys(LISTS) as List[]).map((key) => [key, (items ?? []).filter((i) => i.list === key && i.status === LISTS[key].open).length]))}
+        onRefresh={() => {
+          setError("");
+          return load();
+        }}
+      >
+        <AddForm
+          placeholder={config.placeholder}
+          onAdd={(name) =>
+            run(async () => {
+              const created = await api.post<Item>("/api/items", { list, name });
+              setItems((current) => [...(current ?? []), created]);
+            })
+          }
+        />
+      </MainTop>
       <ErrorText>{error}</ErrorText>
 
       {items === null && !error && <p className="muted center">読み込み中…</p>}

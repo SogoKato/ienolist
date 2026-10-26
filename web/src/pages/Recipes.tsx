@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { api, type Book, type Cook, type Recipe, type Tag } from "../api";
 import { localDate, shortDate } from "../dates";
-import { MainHeader, MainTabs } from "../nav";
+import { MainTop } from "../nav";
 import { parseTags } from "../tags";
 import { describeError } from "../passkeys";
 import { ErrorText, Page } from "../ui";
@@ -57,6 +57,8 @@ export function Recipes() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [error, setError] = useState("");
+  // Bumped to fetch the list again with the same search and filters.
+  const [version, setVersion] = useState(0);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -89,7 +91,7 @@ export function Recipes() {
       stale = true;
       clearTimeout(timer);
     };
-  }, [query, search]);
+  }, [query, search, version]);
 
   const toggleTag = (tag: string) =>
     navigate(filterPath(selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag], bookId), { replace: true });
@@ -123,15 +125,21 @@ export function Recipes() {
 
   return (
     <main className="page">
-      <MainHeader />
-      <MainTabs active="recipes" />
-
-      <div className="add">
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="料理名や材料で探す" aria-label="レシピを探す" maxLength={200} />
-        <Link href="/recipes/new" className="button primary">
-          追加
-        </Link>
-      </div>
+      <MainTop
+        active="recipes"
+        onRefresh={() => {
+          setError("");
+          setVersion((v) => v + 1);
+          return loadGroups();
+        }}
+      >
+        <div className="add">
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="料理名や材料で探す" aria-label="レシピを探す" maxLength={200} />
+          <Link href="/recipes/new" className="button primary">
+            追加
+          </Link>
+        </div>
+      </MainTop>
 
       {books.length > 0 && (
         <div className="add">

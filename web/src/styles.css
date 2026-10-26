@@ -27,6 +27,8 @@
 }
 html {
   -webkit-text-size-adjust: 100%;
+  /* No rubber band or browser reload at the top: the main pages pull to refresh on their own. */
+  overscroll-behavior-y: none;
 }
 body {
   margin: 0;
@@ -368,4 +370,26 @@ a.tag {
 .page-field {
   width: 6.5rem;
   flex: none;
+}
+/* The main pages' header, tabs and box stay at the top; the list scrolls under them. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -16px;
+  padding: 0 16px 4px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.top .add {
+  margin-bottom: 4px;
+}
+.pull {
+  display: grid;
+  place-items: center;
+  height: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85rem;
+  transition: height 0.2s ease;
 }
