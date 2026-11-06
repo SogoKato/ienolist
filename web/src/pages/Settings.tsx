@@ -41,8 +41,14 @@ export function Settings() {
 // What a connection may do, over everything the app has now or adds later.
 const access = (scopes: string[]) => (scopes.includes("write") ? "閲覧と編集" : "閲覧のみ");
 
+// Where an assistant connects: the MCP endpoint at the address the app is open at.
+const mcpUrl = () => `${window.location.origin}/mcp`;
+// claude.ai's link to its "add custom connector" dialog, filled in; the person still confirms there.
+const claudeLink = () => `https://claude.ai/customize/connectors?${new URLSearchParams({ modal: "add-custom-connector", connectorName: "家のリスト", connectorUrl: mcpUrl() })}`;
+
 function Connections({ onError }: { onError(message: string): void }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
+  const [guide, setGuide] = useState<"claude" | "chatgpt" | null>(null);
   const load = useCallback(() => api.get<{ connections: Connection[] }>("/api/connections").then((r) => setConnections(r.connections), (e) => onError(describeError(e))), [onError]);
   useEffect(() => {
     load();
@@ -76,7 +82,52 @@ function Connections({ onError }: { onError(message: string): void }) {
           </li>
         ))}
       </ul>
+      {/* Neither assistant can be connected from here in one step: claude.ai opens its dialog filled in,
+          and ChatGPT adds servers only in a browser, by hand. */}
+      <div className="row-actions connect">
+        <button aria-expanded={guide === "claude"} onClick={() => setGuide(guide === "claude" ? null : "claude")}>
+          Claude とつなぐ
+        </button>
+        <button aria-expanded={guide === "chatgpt"} onClick={() => setGuide(guide === "chatgpt" ? null : "chatgpt")}>
+          ChatGPT とつなぐ
+        </button>
+      </div>
+      {guide === "claude" && (
+        <div className="invite">
+          <p>開いた画面で「追加」を押し、続く家のリストの画面で接続を許可してください。</p>
+          <a className="button primary" href={claudeLink()} target="_blank" rel="noopener noreferrer">
+            Claude の追加画面を開く
+          </a>
+          <p className="muted">Claude のアプリからは、設定のコネクタで「カスタムコネクタを追加」を選び、名前に「家のリスト」、URL に次を入れても追加できます。</p>
+          <McpUrl />
+        </div>
+      )}
+      {guide === "chatgpt" && (
+        <div className="invite">
+          <p>ChatGPT のアプリでは追加できません。Safari などのブラウザで ChatGPT にログインして進めてください。</p>
+          <ol className="steps">
+            <li>下のボタンで ChatGPT のプラグインの画面を開く（アプリが開いたら、ブラウザで chatgpt.com を開き直す）</li>
+            <li>「＋」から、カスタム MCP サーバーの追加を選ぶ（見つからなければ、設定の詳細設定で開発者モードをオンにする）</li>
+            <li>名前に「家のリスト」、URL に下の URL を入れ、認証は OAuth にして作成する</li>
+            <li>続く家のリストの画面で接続を許可する</li>
+          </ol>
+          <McpUrl />
+          <a className="button" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">
+            ChatGPT を開く
+          </a>
+        </div>
+      )}
     </section>
+  );
+}
+
+function McpUrl() {
+  const [copied, setCopied] = useState(false);
+  return (
+    <>
+      <input readOnly value={mcpUrl()} aria-label="接続先の URL" onFocus={(e) => e.currentTarget.select()} />
+      <button onClick={() => navigator.clipboard?.writeText(mcpUrl()).then(() => setCopied(true), () => {})}>{copied ? "コピーしました" : "URL をコピー"}</button>
+    </>
   );
 }
 

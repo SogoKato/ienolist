@@ -323,6 +323,21 @@ test.describe("connecting an assistant", () => {
     accessToken = access;
   });
 
+  test("the settings show how to connect Claude (a filled-in link) and ChatGPT (steps in a browser)", async () => {
+    await aki.goto("/settings");
+    await aki.getByRole("button", { name: "Claude とつなぐ" }).click();
+    const link = new URL((await aki.getByRole("link", { name: "Claude の追加画面を開く" }).getAttribute("href"))!);
+    expect([link.origin + link.pathname, link.searchParams.get("modal"), link.searchParams.get("connectorName"), link.searchParams.get("connectorUrl")]).toEqual([
+      "https://claude.ai/customize/connectors",
+      "add-custom-connector",
+      "家のリスト",
+      "http://localhost:18787/mcp",
+    ]);
+    await aki.getByRole("button", { name: "ChatGPT とつなぐ" }).click();
+    await expect(aki.getByText("ChatGPT のアプリでは追加できません。", { exact: false })).toBeVisible();
+    await expect(aki.getByLabel("接続先の URL")).toHaveValue("http://localhost:18787/mcp");
+  });
+
   test("the connection is listed in the settings, and disconnecting cuts it off", async () => {
     await aki.goto("/settings");
     await expect(aki.getByText("E2E アシスタント")).toBeVisible();
