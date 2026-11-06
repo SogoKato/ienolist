@@ -122,7 +122,7 @@ test("when every client is in use the registry refuses a new one", async () => {
     const clientId = `client${i}`;
     raw.prepare("INSERT INTO oauth_clients (client_id, name, redirect_uris, created_at) VALUES (?, 'x', '[]', ?)").run(clientId, clock);
     raw.prepare(
-      "INSERT INTO oauth_tokens (id, client_id, user_id, household_id, scope, resource, access_hash, refresh_hash, access_expires_at, refresh_expires_at, created_at) VALUES (?, ?, 'u1', 'h1', 'items:read', ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO oauth_tokens (id, client_id, user_id, household_id, scope, resource, access_hash, refresh_hash, access_expires_at, refresh_expires_at, created_at) VALUES (?, ?, 'u1', 'h1', 'read', ?, ?, ?, ?, ?, ?)",
     ).run(`t${i}`, clientId, `${ORIGIN}/mcp`, `a${i}`, `r${i}`, clock + 3600, clock + 30 * DAY, clock);
   }
   await rejected(oauth.register({ redirect_uris: [REDIRECT] }), "invalid_client_metadata");
@@ -147,19 +147,22 @@ test("a good request is accepted with every scope by default", async () => {
   const parsed = await oauth.parseAuthorization(authParams(clientId, challenge));
   assert.deepEqual(parsed, {
     kind: "ok",
-    request: { clientId, clientName: "Claude", redirectUri: REDIRECT, codeChallenge: challenge, scope: "items:read items:write recipes:read recipes:write", state: "xyz", resource: `${ORIGIN}/mcp` },
+    request: { clientId, clientName: "Claude", redirectUri: REDIRECT, codeChallenge: challenge, scope: "read write", state: "xyz", resource: `${ORIGIN}/mcp` },
   });
 });
 
-test("scopes are narrowed to the supported ones and may be read-only", async () => {
+test("scopes are narrowed to the supported ones, write comes with read, and read may come alone", async () => {
   const clientId = await registerClient();
   const { challenge } = await pkce();
   const only = async (scope: string) => {
     const parsed = await oauth.parseAuthorization(authParams(clientId, challenge, { scope }));
     return parsed.kind === "ok" ? parsed.request.scope : parsed;
   };
-  assert.equal(await only("items:read"), "items:read");
-  assert.equal(await only("items:read admin offline_access"), "items:read");
+  assert.equal(await only("read"), "read");
+  assert.equal(await only("read admin offline_access"), "read");
+  assert.equal(await only("write"), "read write");
+  // Scopes from before the two levels are no longer known.
+  assert.equal(((await only("items:read items:write")) as { kind: string }).kind, "redirect");
   const none = await oauth.parseAuthorization(authParams(clientId, challenge, { scope: "admin" }));
   assert.equal(none.kind, "redirect");
   assert.equal(new URL((none as { redirectTo: string }).redirectTo).searchParams.get("error"), "invalid_scope");
@@ -248,16 +251,27 @@ test("a code and its verifier are traded for tokens that work as a grant for thi
   const { clientId, tokens } = await connect();
   assert.equal(tokens.token_type, "Bearer");
   assert.equal(tokens.expires_in, 3600);
-  assert.equal(tokens.scope, "items:read items:write recipes:read recipes:write");
-  assert.deepEqual(await oauth.verifyAccessToken(tokens.access_token), { userId: "u1", householdId: "h1", clientId, scopes: ["items:read", "items:write", "recipes:read", "recipes:write"] });
+  assert.equal(tokens.scope, "read write");
+  assert.deepEqual(await oauth.verifyAccessToken(tokens.access_token), { userId: "u1", householdId: "h1", clientId, scopes: ["read", "write"] });
   // Only hashes are kept.
   const stored = { ...raw.prepare("SELECT access_hash, refresh_hash FROM oauth_tokens").get()! };
   assert.deepEqual(stored, { access_hash: await sha256(tokens.access_token), refresh_hash: await sha256(tokens.refresh_token) });
 });
 
+test("the person may allow reading only, whatever the client asked for", async () => {
+  const clientId = await registerClient();
+  const { verifier, challenge } = await pkce();
+  const parsed = await oauth.parseAuthorization(authParams(clientId, challenge));
+  if (parsed.kind !== "ok") throw new Error("unreachable");
+  const code = new URL(await oauth.approve(aki, parsed.request, { readOnly: true })).searchParams.get("code")!;
+  const tokens = await oauth.token({ grant_type: "authorization_code", code, code_verifier: verifier, client_id: clientId, redirect_uri: REDIRECT });
+  assert.equal(tokens.scope, "read");
+  assert.deepEqual((await oauth.verifyAccessToken(tokens.access_token))?.scopes, ["read"]);
+});
+
 test("a grant for a person in another household is scoped to that household", async () => {
-  const { clientId, tokens } = await connect(bo, "items:read");
-  assert.deepEqual(await oauth.verifyAccessToken(tokens.access_token), { userId: "u2", householdId: "h2", clientId, scopes: ["items:read"] });
+  const { clientId, tokens } = await connect(bo, "read");
+  assert.deepEqual(await oauth.verifyAccessToken(tokens.access_token), { userId: "u2", householdId: "h2", clientId, scopes: ["read"] });
 });
 
 test("a code works once, even when the first try failed", async () => {
@@ -400,13 +414,13 @@ test("revoked and expired grants are swept away later", async () => {
 // --- connections -------------------------------------------------------------------------------
 
 test("a person sees only their own connections, newest first, and can disconnect them", async () => {
-  const first = await connect(aki, "items:read");
+  const first = await connect(aki, "read");
   clock++;
   const second = await connect(aki);
   await connect(bo);
 
   const mine = await oauth.listConnections(aki);
-  assert.deepEqual(mine.map((c) => c.scopes), [["items:read", "items:write", "recipes:read", "recipes:write"], ["items:read"]]);
+  assert.deepEqual(mine.map((c) => c.scopes), [["read", "write"], ["read"]]);
   assert.deepEqual(mine.map((c) => c.clientName), ["Claude", "Claude"]);
   assert.equal(mine[0].createdAt, clock);
   assert.equal((await oauth.listConnections(bo)).length, 1);
@@ -459,13 +473,13 @@ test("the metadata points at this app's endpoints", () => {
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
-    scopes_supported: ["items:read", "items:write", "recipes:read", "recipes:write"],
+    scopes_supported: ["read", "write"],
     authorization_response_iss_parameter_supported: true,
   });
   assert.deepEqual(oauth.protectedResourceMetadata("Home lists"), {
     resource: `${ORIGIN}/mcp`,
     authorization_servers: [ORIGIN],
-    scopes_supported: ["items:read", "items:write", "recipes:read", "recipes:write"],
+    scopes_supported: ["read", "write"],
     bearer_methods_supported: ["header"],
     resource_name: "Home lists",
   });

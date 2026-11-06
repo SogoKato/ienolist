@@ -40,6 +40,7 @@ const handle = createMcpHandler({
   tools,
   toolsJson: serializeTools(tools as never),
   userFacingError: (e) => (e instanceof Visible ? e.message : null),
+  missingScope: (scope) => `Missing scope: ${scope}`,
 });
 
 const V = "2026-07-28";

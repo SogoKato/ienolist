@@ -279,8 +279,9 @@ test.describe("connecting an assistant", () => {
     await expect(aki.getByRole("heading", { name: "接続を許可しますか？" })).toBeVisible();
     await expect(aki.getByText("E2E アシスタント")).toBeVisible();
     await expect(aki.getByText("claude.ai")).toBeVisible();
-    await expect(aki.getByText("アイテムを追加・変更・削除・移動する")).toBeVisible();
-    await expect(aki.getByText("レシピと作った記録を追加・変更・削除する")).toBeVisible();
+    // The person chooses how much it may do; reading and changing is the default. Reading is all this test needs.
+    await expect(aki.getByRole("radio", { name: /閲覧と編集/ })).toBeChecked();
+    await aki.getByRole("radio", { name: /閲覧のみ/ }).check();
     await aki.getByRole("button", { name: "許可する" }).click();
 
     await aki.waitForURL((url) => url.origin === "https://claude.ai");
@@ -325,7 +326,7 @@ test.describe("connecting an assistant", () => {
   test("the connection is listed in the settings, and disconnecting cuts it off", async () => {
     await aki.goto("/settings");
     await expect(aki.getByText("E2E アシスタント")).toBeVisible();
-    await expect(aki.getByText("リスト: 閲覧と編集 ・ レシピ: 閲覧と編集")).toBeVisible();
+    await expect(aki.getByText(/から ・ 閲覧のみ$/)).toBeVisible();
     await aki.getByRole("button", { name: "解除" }).click();
     await expect(aki.getByText("接続はありません。")).toBeVisible();
 

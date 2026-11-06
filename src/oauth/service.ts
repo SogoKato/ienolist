@@ -4,9 +4,9 @@ import { atomically, type Db } from "../db/types.ts";
 import type { Principal } from "../auth/service.ts";
 import { ulid } from "../lib/ulid.ts";
 import { randomToken, safeEqual, sha256 } from "../lib/token.ts";
-import { SCOPE_READ, SCOPE_RECIPES_READ, SCOPE_RECIPES_WRITE, SCOPE_WRITE } from "../mcp/tools.ts";
+import { SCOPE_READ, SCOPE_WRITE } from "../mcp/tools.ts";
 
-export const SCOPES = [SCOPE_READ, SCOPE_WRITE, SCOPE_RECIPES_READ, SCOPE_RECIPES_WRITE] as const;
+export const SCOPES = [SCOPE_READ, SCOPE_WRITE] as const;
 
 const CODE_TTL = 5 * 60;
 const ACCESS_TTL = 60 * 60;
@@ -45,6 +45,7 @@ export type AuthorizationRequest = {
   clientName: string;
   redirectUri: string;
   codeChallenge: string;
+  // The most the client asked for; the person may allow less on the consent screen.
   scope: string;
   state: string | null;
   resource: string;
@@ -273,8 +274,10 @@ export function createOAuthService(db: Db, config: OAuthConfig) {
       if (params.resource && trimSlash(params.resource) !== resource) return fail("invalid_target", "Unknown resource");
 
       const requested = (params.scope ?? "").split(/\s+/).filter(Boolean);
-      const scopes = requested.filter((s) => (SCOPES as readonly string[]).includes(s));
-      if (requested.length > 0 && scopes.length === 0) return fail("invalid_scope", "No supported scope requested");
+      const known = requested.filter((s) => (SCOPES as readonly string[]).includes(s));
+      if (requested.length > 0 && known.length === 0) return fail("invalid_scope", "No supported scope requested");
+      // Nothing asked for means everything; write comes with read.
+      const scopes = known.length === 0 || known.includes(SCOPE_WRITE) ? SCOPES : [SCOPE_READ];
       return {
         kind: "ok",
         request: {
@@ -282,15 +285,16 @@ export function createOAuthService(db: Db, config: OAuthConfig) {
           clientName: client.name,
           redirectUri,
           codeChallenge: challenge,
-          scope: (scopes.length ? scopes : SCOPES).join(" "),
+          scope: scopes.join(" "),
           state,
           resource,
         },
       };
     },
 
-    // The signed-in person said yes: the URL to send the client back to, carrying a one-time code.
-    async approve(principal: Principal, request: AuthorizationRequest): Promise<string> {
+    // The signed-in person said yes, perhaps to reading only: the URL to send the client back to,
+    // carrying a one-time code.
+    async approve(principal: Principal, request: AuthorizationRequest, { readOnly = false } = {}): Promise<string> {
       const code = randomToken();
       await atomically(db, [
         ...sweepStatements(),
@@ -299,7 +303,7 @@ export function createOAuthService(db: Db, config: OAuthConfig) {
           clientId: request.clientId,
           redirectUri: request.redirectUri,
           codeChallenge: request.codeChallenge,
-          scope: request.scope,
+          scope: readOnly ? SCOPE_READ : request.scope,
           resource: request.resource,
           userId: principal.userId,
           householdId: principal.householdId,

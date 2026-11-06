@@ -8,10 +8,14 @@ import { defineTool, type ToolDef, type ToolResult } from "./registry.ts";
 
 export type Ctx = { items: ItemService; recipes: RecipeService; actor: Actor };
 
-export const SCOPE_READ = "items:read";
-export const SCOPE_WRITE = "items:write";
-export const SCOPE_RECIPES_READ = "recipes:read";
-export const SCOPE_RECIPES_WRITE = "recipes:write";
+// What a connection may do: read, or also change (write comes with read). Every tool, and any added
+// later, needs one of the two, so adding tools never asks for new scopes.
+export const SCOPE_READ = "read";
+export const SCOPE_WRITE = "write";
+
+// What a read-only connection hears when asked to change something, to pass on to the person.
+export const missingScope = () =>
+  "This connection may only read. To let it make changes, disconnect it in the settings of 家のリスト and connect again, choosing 閲覧と編集 (read and change).";
 
 const result = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
 
@@ -158,7 +162,7 @@ const listRecipes = defineTool<Ctx, any>({
     "List the household's recipes, most recently changed first, with how many times each was cooked and when last (lastCookedOn). " +
     "The text is left out unless withBody is true; use get_recipe for one. " +
     RECIPE_HELP,
-  scope: SCOPE_RECIPES_READ,
+  scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
   input: z.object({
     query: z.optional(z.string().check(z.maxLength(QUERY_MAX), z.describe("Only recipes whose title or text contains this, e.g. an ingredient."))),
@@ -174,7 +178,7 @@ const listRecipes = defineTool<Ctx, any>({
 const getRecipe = defineTool<Ctx, any>({
   name: "get_recipe",
   description: "Get one recipe with its text, link or book and page, tags, and how often and when it was last cooked.",
-  scope: SCOPE_RECIPES_READ,
+  scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
   input: z.object({ id: recipeId }),
   async handler(args, { recipes, actor }) {
@@ -190,7 +194,7 @@ const createRecipe = defineTool<Ctx, any>({
     " When saving one from a web page, keep the link as the source and write only what the household wants to remember (their changes, a short summary); do not copy the whole page." +
     " When saving one from a book (e.g. from a photo of a page), give the book's title and the page, reusing the exact title of a book they already have (list_books); the text can hold what is needed to cook it. " +
     TAG_HELP,
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: false },
   input: z.object({
     title: z.string().check(z.minLength(1), z.maxLength(TITLE_MAX), z.describe("The dish, e.g. チキンカレー.")),
@@ -211,7 +215,7 @@ const updateRecipe = defineTool<Ctx, any>({
     "Change a recipe; only the given fields change. A new text replaces the old one entirely, and new tags replace all of its tags " +
     "(to add one, give the current tags plus the new one). Removing the book removes the page. " +
     TAG_HELP,
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: false },
   input: z.object({
     id: recipeId,
@@ -230,7 +234,7 @@ const updateRecipe = defineTool<Ctx, any>({
 const deleteRecipe = defineTool<Ctx, any>({
   name: "delete_recipe",
   description: "Delete a recipe permanently. Its cook records stay (list_cooks), under the title they were cooked as.",
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: true },
   input: z.object({ id: recipeId }),
   async handler(args, { recipes, actor }) {
@@ -244,7 +248,7 @@ const recordCook = defineTool<Ctx, any>({
   description:
     "Record that the household cooked a recipe on a day. Several records per recipe are normal; they show what is made again and again. " +
     "Use the household's local date (if they cooked it today, today's date where they are).",
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: false },
   input: z.object({
     recipeId,
@@ -261,7 +265,7 @@ const listCooks = defineTool<Ctx, any>({
   description:
     "What was cooked when, newest day first. Records of deleted recipes stay, with recipeId null. " +
     "Useful for what was made recently, what is a regular, or what has not been made for a while.",
-  scope: SCOPE_RECIPES_READ,
+  scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
   input: z.object({
     recipeId: z.optional(recipeId.check(z.describe("Only this recipe."))),
@@ -276,7 +280,7 @@ const listCooks = defineTool<Ctx, any>({
 const deleteCook = defineTool<Ctx, any>({
   name: "delete_cook",
   description: "Delete one cook record, e.g. one recorded by mistake.",
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: true },
   input: z.object({ id: z.string().check(z.minLength(1), z.maxLength(64), z.describe("Cook record id, as returned by record_cook or list_cooks.")) }),
   async handler(args, { recipes, actor }) {
@@ -288,7 +292,7 @@ const deleteCook = defineTool<Ctx, any>({
 const listTags = defineTool<Ctx, any>({
   name: "list_tags",
   description: "The tags in use, most used first, with how many recipes have each. " + TAG_HELP,
-  scope: SCOPE_RECIPES_READ,
+  scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
   input: z.object({}),
   async handler(_args, { recipes, actor }) {
@@ -299,7 +303,7 @@ const listTags = defineTool<Ctx, any>({
 const renameTag = defineTool<Ctx, any>({
   name: "rename_tag",
   description: "Rename a tag on every recipe that has it, e.g. to fix a spelling or merge near-duplicates: renaming onto a tag in use merges the two.",
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: false },
   input: z.object({ from: tag.check(z.describe("The tag now.")), to: tag.check(z.describe("What it becomes.")) }),
   async handler(args, { recipes, actor }) {
@@ -310,7 +314,7 @@ const renameTag = defineTool<Ctx, any>({
 const listBooks = defineTool<Ctx, any>({
   name: "list_books",
   description: "The books (and booklets, magazines) the household's recipes come from, by title, with how many recipes each has.",
-  scope: SCOPE_RECIPES_READ,
+  scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
   input: z.object({}),
   async handler(_args, { recipes, actor }) {
@@ -321,7 +325,7 @@ const listBooks = defineTool<Ctx, any>({
 const renameBook = defineTool<Ctx, any>({
   name: "rename_book",
   description: "Change a book's title; every recipe from it shows the new title.",
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: false },
   input: z.object({ id: bookId, title: z.string().check(z.minLength(1), z.maxLength(TITLE_MAX)) }),
   async handler(args, { recipes, actor }) {
@@ -333,7 +337,7 @@ const renameBook = defineTool<Ctx, any>({
 const deleteBook = defineTool<Ctx, any>({
   name: "delete_book",
   description: "Delete a book. Its recipes stay, without the book and page.",
-  scope: SCOPE_RECIPES_WRITE,
+  scope: SCOPE_WRITE,
   annotations: { destructiveHint: true },
   input: z.object({ id: bookId }),
   async handler(args, { recipes, actor }) {

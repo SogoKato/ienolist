@@ -38,13 +38,8 @@ export function Settings() {
   );
 }
 
-// What a connection may do, per kind of data. Connections made before recipes existed have no
-// recipe scopes; they get them by connecting again.
-function access(scopes: string[]): string {
-  const level = (kind: string) => (scopes.includes(`${kind}:write`) ? "閲覧と編集" : scopes.includes(`${kind}:read`) ? "閲覧のみ" : "なし");
-  const recipes = level("recipes");
-  return `リスト: ${level("items")} ・ レシピ: ${recipes}${recipes === "なし" ? "（使うには接続し直してください）" : ""}`;
-}
+// What a connection may do, over everything the app has now or adds later.
+const access = (scopes: string[]) => (scopes.includes("write") ? "閲覧と編集" : "閲覧のみ");
 
 function Connections({ onError }: { onError(message: string): void }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);

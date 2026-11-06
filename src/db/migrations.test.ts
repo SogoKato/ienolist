@@ -78,7 +78,7 @@ test("app_meta keys are unique, so only one first-run setup can win", () => {
 test("deleting an OAuth client removes its codes and tokens", () => {
   db.exec("INSERT INTO oauth_clients (client_id, name, redirect_uris, created_at) VALUES ('c1', 'Claude', '[]', 0)");
   db.exec(
-    "INSERT INTO oauth_tokens (id, client_id, user_id, household_id, scope, resource, access_hash, refresh_hash, access_expires_at, refresh_expires_at, created_at) VALUES ('t1', 'c1', 'u1', 'h1', 'items:read', 'r', 'a', 'b', 1, 1, 0)",
+    "INSERT INTO oauth_tokens (id, client_id, user_id, household_id, scope, resource, access_hash, refresh_hash, access_expires_at, refresh_expires_at, created_at) VALUES ('t1', 'c1', 'u1', 'h1', 'read', 'r', 'a', 'b', 1, 1, 0)",
   );
   assert.throws(
     () => db.exec("INSERT INTO oauth_tokens (id, client_id, user_id, household_id, scope, resource, access_hash, refresh_hash, access_expires_at, refresh_expires_at, created_at) VALUES ('t2', 'c1', 'u1', 'h1', 's', 'r', 'a', 'c', 1, 1, 0)"),

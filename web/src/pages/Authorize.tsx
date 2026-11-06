@@ -8,13 +8,6 @@ import { ErrorText, Page } from "../ui";
 type Ask = { clientName: string; redirectHost: string; scopes: string[] };
 type Answer = Ask | { redirectTo: string };
 
-const SCOPE_TEXT: Record<string, string> = {
-  "items:read": "買い物リストと冷蔵庫リストを見る",
-  "items:write": "アイテムを追加・変更・削除・移動する",
-  "recipes:read": "レシピと、いつ何を作ったかを見る",
-  "recipes:write": "レシピと作った記録を追加・変更・削除する",
-};
-
 // Where an assistant (Claude, ChatGPT, …) asks to use the lists on the person's behalf.
 export function Authorize() {
   const search = useSearch();
@@ -22,6 +15,7 @@ export function Authorize() {
   const [ask, setAsk] = useState<Ask | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
 
   useEffect(() => {
     api.get<Answer>(`/api/oauth/authorization?${search}`).then(
@@ -34,7 +28,7 @@ export function Authorize() {
     setBusy(true);
     setError("");
     try {
-      const { redirectTo } = await api.post<{ redirectTo: string }>("/api/oauth/authorize", { params: Object.fromEntries(new URLSearchParams(search)), decision });
+      const { redirectTo } = await api.post<{ redirectTo: string }>("/api/oauth/authorize", { params: Object.fromEntries(new URLSearchParams(search)), decision, readOnly });
       window.location.assign(redirectTo);
     } catch (e) {
       setError(describeError(e));
@@ -57,11 +51,28 @@ export function Authorize() {
       <p>
         <strong>{ask.clientName}</strong> が、{state.status === "in" ? `${state.me.household.name} のリスト` : "リスト"}を使おうとしています。
       </p>
-      <ul className="plain">
-        {ask.scopes.map((scope) => (
-          <li key={scope}>{SCOPE_TEXT[scope] ?? scope}</li>
-        ))}
-      </ul>
+      {/* What it may do covers the features added later too, so nothing has to be allowed again. */}
+      {ask.scopes.includes("write") ? (
+        <fieldset className="choices">
+          <legend>できること（今後増える機能も含みます）</legend>
+          <label className="choice">
+            <input type="radio" name="access" checked={!readOnly} onChange={() => setReadOnly(false)} />
+            <span>
+              閲覧と編集（おすすめ）
+              <span className="note">リストやレシピを見て、追加・変更・削除もします。</span>
+            </span>
+          </label>
+          <label className="choice">
+            <input type="radio" name="access" checked={readOnly} onChange={() => setReadOnly(true)} />
+            <span>
+              閲覧のみ
+              <span className="note">見るだけで、追加・変更・削除はしません。</span>
+            </span>
+          </label>
+        </fieldset>
+      ) : (
+        <p>リストやレシピを見るだけで、追加・変更・削除はしません（今後増える機能も含みます）。</p>
+      )}
       <p className="muted">
         許可すると、ブラウザは <code>{ask.redirectHost}</code> に戻ります。心当たりがなければ「許可しない」を選んでください。名前は相手が自己申告したものです。
       </p>

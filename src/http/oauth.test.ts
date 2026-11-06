@@ -7,6 +7,7 @@ import { createTestDb } from "../db/testing.ts";
 import { createItemService } from "../items/service.ts";
 import { createRecipeService } from "../recipes/service.ts";
 import { randomToken, sha256 } from "../lib/token.ts";
+import { missingScope } from "../mcp/tools.ts";
 import { createOAuthService } from "../oauth/service.ts";
 import { createApp } from "./app.ts";
 import { Browser, ORIGIN, setUpHousehold } from "./testing.ts";
@@ -68,14 +69,14 @@ async function authorizeQuery(clientId: string, extra: Record<string, string> = 
 }
 
 // The whole connection: register, send the person to the consent step, allow, trade the code.
-async function connect(browser: Browser, extra: Record<string, string> = {}) {
+async function connect(browser: Browser, extra: Record<string, string> = {}, readOnly = false) {
   const clientId = await registerClient();
   const { verifier, query } = await authorizeQuery(clientId, extra);
   const start = await request("GET", `/oauth/authorize?${query}`);
   assert.equal(start.status, 302);
   assert.equal(start.headers.get("location"), `/authorize?${query}`);
   const params = Object.fromEntries(new URLSearchParams(query));
-  const decision = await browser.post("/api/oauth/authorize", { params, decision: "allow" });
+  const decision = await browser.post("/api/oauth/authorize", { params, decision: "allow", readOnly });
   assert.equal(decision.status, 200);
   const back = new URL((await decision.json()).redirectTo);
   assert.equal(back.searchParams.get("state"), "s1");
@@ -187,10 +188,10 @@ test("the consent API needs a signed-in person and the app's own origin", async 
 test("the consent screen is told who is asking and where the person will be sent back", async () => {
   const browser = await signedIn();
   const clientId = await registerClient();
-  const { query } = await authorizeQuery(clientId, { scope: "items:read" });
+  const { query } = await authorizeQuery(clientId, { scope: "read" });
   const res = await browser.get(`/api/oauth/authorization?${query}`);
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { clientName: "Claude", redirectHost: "claude.ai", scopes: ["items:read"] });
+  assert.deepEqual(await res.json(), { clientName: "Claude", redirectHost: "claude.ai", scopes: ["read"] });
 
   const unknown = await browser.get(`/api/oauth/authorization?${(await authorizeQuery("nobody")).query}`);
   assert.equal(unknown.status, 400);
@@ -274,15 +275,15 @@ test("an MCP client reads and writes the household's lists, and the web sees who
   assert.deepEqual({ ...raw.prepare("SELECT user_id, client_id FROM item_events WHERE id = ?").get(event.id)! }, { user_id: me.user.id, client_id: clientId });
 });
 
-test("a client given read access only cannot write", async () => {
+test("a client the person allowed to read only cannot write, though it asked for more", async () => {
   const browser = await signedIn();
-  const { tokens } = await connect(browser, { scope: "items:read" });
-  assert.equal(tokens.scope, "items:read");
+  const { tokens } = await connect(browser, {}, true);
+  assert.equal(tokens.scope, "read");
   await browser.post("/api/items", { list: "fridge", name: "牛乳" });
   assert.equal((await toolData(await callTool(tokens.access_token, "list_items"))).data.items.length, 1);
   const denied = await (await callTool(tokens.access_token, "create_item", { list: "fridge", name: "卵" })).json();
   assert.equal(denied.result.isError, true);
-  assert.match(denied.result.content[0].text, /Missing scope: items:write/);
+  assert.equal(denied.result.content[0].text, missingScope());
   assert.equal((await (await browser.get("/api/items")).json()).items.length, 1);
 });
 
@@ -293,7 +294,7 @@ test("connections can be listed and disconnected, which cuts the client off", as
   const { tokens } = await connect(browser);
   const { connections } = await (await browser.get("/api/connections")).json();
   assert.equal(connections.length, 1);
-  assert.deepEqual([connections[0].clientName, connections[0].scopes, connections[0].createdAt], ["Claude", ["items:read", "items:write", "recipes:read", "recipes:write"], clock]);
+  assert.deepEqual([connections[0].clientName, connections[0].scopes, connections[0].createdAt], ["Claude", ["read", "write"], clock]);
   assert.deepEqual(Object.keys(connections[0]).sort(), ["clientName", "createdAt", "id", "scopes"]);
 
   assert.equal((await browser.delete(`/api/connections/${connections[0].id}`)).status, 204);

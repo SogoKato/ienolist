@@ -41,16 +41,18 @@ export type McpServerOptions<Ctx> = {
   toolsJson: string;
   // Anything thrown by a tool that is not a deliberate, user-facing error ends up here.
   userFacingError: (error: unknown) => string | null;
+  // The answer to a call the token's scopes do not cover.
+  missingScope: (scope: string) => string;
 };
 
-export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacingError }: McpServerOptions<Ctx>) {
+export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacingError, missingScope }: McpServerOptions<Ctx>) {
   const byName = new Map(tools.map((t) => [t.name, t]));
 
   async function callTool(ctx: Ctx, scopes: readonly string[], params: any) {
     const tool = typeof params?.name === "string" ? byName.get(params.name) : undefined;
     if (!tool) return { error: `Unknown tool: ${String(params?.name)}` };
     const text = (message: string) => ({ result: { content: [{ type: "text", text: message }], isError: true } });
-    if (!scopes.includes(tool.scope)) return text(`Missing scope: ${tool.scope}`);
+    if (!scopes.includes(tool.scope)) return text(missingScope(tool.scope));
     const parsed = tool.input.safeParse(params.arguments ?? {});
     if (!parsed.success) return text(`Invalid arguments: ${formatIssues(parsed.error)}`);
     try {

@@ -247,7 +247,7 @@ label {
   color: var(--muted);
   font-size: 0.8125rem;
 }
-input:not([type="checkbox"]),
+input:not([type="checkbox"], [type="radio"]),
 textarea,
 select {
   width: 100%;
@@ -269,7 +269,7 @@ textarea::placeholder {
   color: var(--muted);
   opacity: 1;
 }
-input:not([type="checkbox"]):focus,
+input:not([type="checkbox"], [type="radio"]):focus,
 textarea:focus,
 select:focus {
   outline: none;
@@ -614,6 +614,46 @@ button.icon:active {
 }
 .invite p {
   margin: 0;
+}
+/* One of a few answers (how much an assistant may do), each with what it means under it. */
+.choices {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
+}
+.choices legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.choice:has(input:checked) {
+  border-color: var(--accent-ink);
+}
+.choice input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+.choice > span {
+  display: grid;
+  gap: 2px;
 }
 
 /* --- recipes ---------------------------------------------------------------------------------- */

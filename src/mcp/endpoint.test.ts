@@ -5,6 +5,7 @@ import { createTestDb } from "../db/testing.ts";
 import { createItemService, type Actor, type ItemService } from "../items/service.ts";
 import { createRecipeService } from "../recipes/service.ts";
 import { handleMcpRequest, type McpDeps } from "./endpoint.ts";
+import { missingScope } from "./tools.ts";
 
 // Response.json() is typed unknown; the tests inspect arbitrary JSON-RPC payloads.
 declare global {
@@ -14,7 +15,7 @@ declare global {
 }
 
 const claude: Actor = { householdId: "h1", userId: "u1", source: "mcp", clientId: "c1" };
-const ALL = ["items:read", "items:write", "recipes:read", "recipes:write"];
+const ALL = ["read", "write"];
 let raw: DatabaseSync;
 let items: ItemService;
 let deps: McpDeps;
@@ -181,14 +182,14 @@ test("unknown tools are protocol errors; unexpected failures stay generic", asyn
   }
 });
 
-test("scopes: read-only principals cannot call write tools", async () => {
+test("scopes: read-only principals cannot call write tools, and are told how to allow it", async () => {
   const created = data(await modernCall("create_item", { list: "fridge", name: "egg" }));
-  principal = { actor: claude, scopes: ["items:read"] };
+  principal = { actor: claude, scopes: ["read"] };
   assert.equal(data(await modernCall("list_items")).items.length, 1);
   assert.equal(data(await modernCall("list_events")).events.length, 1);
   for (const [name, args] of [["create_item", { list: "fridge", name: "x" }], ["update_item", { id: created.id, name: "x" }], ["move_item", { id: created.id, to: "shopping" }], ["delete_item", { id: created.id }]] as const) {
     const r = await modernCall(name, args);
-    assert.deepEqual([r.isError, r.content[0].text], [true, "Missing scope: items:write"], name);
+    assert.deepEqual([r.isError, r.content[0].text], [true, missingScope()], name);
   }
   assert.equal(data(await modernCall("get_item", { id: created.id })).name, "egg");
   principal = { actor: claude, scopes: [] };
@@ -330,25 +331,19 @@ test("recipes: from a book photo, with tags, then tidied up", async () => {
   assert.deepEqual(data(await modernCall("get_recipe", { id: a.id })).book, null);
 });
 
-test("scopes: a token for the lists alone cannot reach the recipes, and recipes:read cannot write", async () => {
+test("scopes: a read-only token reads the recipes but cannot change them", async () => {
   const curry = data(await modernCall("create_recipe", { title: "カレー" }));
-  // What claude.ai and ChatGPT hold from before recipes existed.
-  principal = { actor: claude, scopes: ["items:read", "items:write"] };
-  assert.deepEqual((await modernCall("list_recipes")).content[0].text, "Missing scope: recipes:read");
-  assert.deepEqual((await modernCall("list_cooks")).content[0].text, "Missing scope: recipes:read");
-  assert.equal((await modernCall("list_items")).isError, undefined);
-
-  principal = { actor: claude, scopes: ["recipes:read"] };
+  principal = { actor: claude, scopes: ["read"] };
   assert.equal(data(await modernCall("list_recipes")).recipes.length, 1);
+  assert.equal((await modernCall("list_cooks")).isError, undefined);
   for (const [name, args] of [
     ["create_recipe", { title: "x" }], ["update_recipe", { id: curry.id, title: "x" }], ["delete_recipe", { id: curry.id }],
     ["record_cook", { recipeId: curry.id, cookedOn: "2026-10-18" }], ["delete_cook", { id: "x" }],
     ["rename_tag", { from: "a", to: "b" }], ["rename_book", { id: "x", title: "y" }], ["delete_book", { id: "x" }],
   ] as const) {
     const r = await modernCall(name, args);
-    assert.deepEqual([r.isError, r.content[0].text], [true, "Missing scope: recipes:write"], name);
+    assert.deepEqual([r.isError, r.content[0].text], [true, missingScope()], name);
   }
-  assert.equal((await modernCall("list_items")).content[0].text, "Missing scope: items:read");
 });
 
 test("a household's tokens only reach its own recipes and cook records", async () => {

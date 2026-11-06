@@ -79,11 +79,11 @@ export function oauthWebRoutes(auth: AuthService, oauth: OAuthService, cookie: S
   });
 
   app.post("/oauth/authorize", async (c) => {
-    const body = await readJson(c, z.object({ params: z.record(z.string(), z.string()), decision: z.enum(["allow", "deny"]) }));
+    const body = await readJson(c, z.object({ params: z.record(z.string(), z.string()), decision: z.enum(["allow", "deny"]), readOnly: z.optional(z.boolean()) }));
     const result = await oauth.parseAuthorization(body.params);
     if (result.kind === "fatal") throw unusable(result);
     if (result.kind === "redirect") return c.json({ redirectTo: result.redirectTo });
-    const redirectTo = body.decision === "allow" ? await oauth.approve(c.get("principal"), result.request) : oauth.deny(result.request);
+    const redirectTo = body.decision === "allow" ? await oauth.approve(c.get("principal"), result.request, { readOnly: body.readOnly }) : oauth.deny(result.request);
     return c.json({ redirectTo });
   });
 
