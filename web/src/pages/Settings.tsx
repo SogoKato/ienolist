@@ -107,9 +107,10 @@ function Connections({ onError }: { onError(message: string): void }) {
           <p>ChatGPT のアプリでは追加できません。Safari などのブラウザで ChatGPT にログインして進めてください。</p>
           <ol className="steps">
             <li>下のボタンで ChatGPT のプラグインの画面を開く（アプリが開いたら、ブラウザで chatgpt.com を開き直す）</li>
-            <li>「＋」から、カスタム MCP サーバーの追加を選ぶ（見つからなければ、設定の詳細設定で開発者モードをオンにする）</li>
-            <li>名前に「家のリスト」、URL に下の URL を入れ、認証は OAuth にして作成する</li>
-            <li>続く家のリストの画面で接続を許可する</li>
+            <li>右上の「追加」から「カスタム MCP サーバーを追加」を選ぶ</li>
+            <li>名前に「家のリスト」、サーバー URL に下の URL を入れる（認証は OAuth のまま）</li>
+            <li>「理解したうえで続けます」にチェックして、「プラグインとして作成」を押す</li>
+            <li>「家のリストに接続」を押し、続く家のリストの画面で接続を許可する</li>
           </ol>
           <McpUrl />
           <a className="button" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">
