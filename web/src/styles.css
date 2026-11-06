@@ -643,9 +643,30 @@ button.icon:active {
 }
 .steps {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   margin: 0;
   padding-left: 1.4em;
+}
+/* What a step needs done right there (a button to press, an address to copy) sits under its words. */
+.steps .button,
+.steps .note {
+  display: flex;
+  margin-top: 8px;
+}
+.mcp-url {
+  display: grid;
+  gap: 8px;
+}
+.steps .mcp-url {
+  margin-top: 8px;
+}
+.mcp-url code {
+  padding: 10px 12px;
+  background: var(--fill);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  user-select: all;
 }
 /* One of a few answers (how much an assistant may do), each with what it means under it. */
 .choices {
@@ -742,23 +763,19 @@ button.icon:active {
   font-size: 0.8125rem;
   font-weight: 600;
 }
-.shot h3 {
-  margin: -6px 0 0;
-  /* Lines break at the comma, not inside a word; a part too long for a line still wraps. */
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  font-size: 1.25rem;
-  line-height: 1.4;
-  font-weight: 700;
-  font-feature-settings: "palt";
+.shot-caption {
+  margin: 0;
+  color: var(--accent-soft-text);
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 /* A made-up conversation, drawn the way chat apps do: the person on the right, the reply on the left. */
 .chat {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 12px;
+  gap: 10px;
+  padding: 16px 12px;
   background: var(--surface);
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow);
@@ -767,14 +784,12 @@ button.icon:active {
   max-width: 88%;
   text-wrap: pretty;
   margin: 0;
-  padding: 8px 12px;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  padding: 10px 14px;
+  font-size: 0.9375rem;
+  line-height: 1.55;
 }
 .bubble.me {
   align-self: flex-end;
-  display: grid;
-  gap: 6px;
   background: var(--accent);
   color: var(--accent-text);
   border-radius: 16px 16px 4px 16px;
@@ -785,13 +800,36 @@ button.icon:active {
   color: var(--text);
   border-radius: 16px 16px 16px 4px;
 }
-.attached {
-  justify-self: end;
-  padding: 2px 8px;
-  border: 1px dashed currentColor;
-  border-radius: 6px;
+/* What was sent along with the words, drawn the way chat apps show it: a photo as a picture, a link
+   as a preview. */
+.sent {
+  align-self: flex-end;
+  margin: 0;
+  color: var(--muted);
   font-size: 0.75rem;
-  opacity: 0.9;
+}
+.sent.photo {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  width: 132px;
+  height: 96px;
+  background: var(--fill);
+  border-radius: 14px;
+}
+.sent.photo svg {
+  width: 28px;
+  height: 28px;
+}
+.sent.link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 88%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
 .shot button.quiet {
   align-self: center;
@@ -807,11 +845,15 @@ button.icon:active {
   font-size: 1.125rem;
   font-weight: 700;
 }
-/* Both ways to connect side by side, as wide as the page: the page leads up to them. */
+/* Both ways to connect, one above the other and as wide as the page: the page leads up to them. */
 .connect-choices {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+.connect-choices button {
+  min-height: 52px;
+  border-color: var(--line-control);
+  font-weight: 600;
 }
 .points {
   display: grid;

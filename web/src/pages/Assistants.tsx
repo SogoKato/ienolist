@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { accessLabel, api, type Connection } from "../api";
 import { useSession } from "../session";
+import { LinkIcon, PhotoIcon } from "../icons";
 import { Page } from "../ui";
 
 // Where an assistant connects: the MCP endpoint at the address the app is open at.
@@ -9,40 +10,40 @@ const mcpUrl = () => `${window.location.origin}/mcp`;
 const claudeLink = (name: string) => `https://claude.ai/customize/connectors?${new URLSearchParams({ modal: "add-custom-connector", connectorName: name, connectorUrl: mcpUrl() })}`;
 
 // What a connected assistant can be asked, each as a short conversation: having connected one does
-// not tell what it can do. `with` is what goes along with the words (a photo, a link); the replies
-// are made up, to show the kind of answer.
-const SHOTS: { label: string; title: string; ask: string; with?: string; reply: string }[] = [
+// not tell what it can do. `sent` is what goes along with the words (a photo, a link); the replies
+// are made up, to show the kind of answer, and `caption` says in a sentence what it did.
+const SHOTS: { label: string; ask: string; sent?: { kind: "photo" | "link"; label: string }; reply: string; caption: string }[] = [
   {
     label: "写真から",
-    title: "レシートを送るだけで、冷蔵庫へ",
+    sent: { kind: "photo", label: "レシートの写真" },
     ask: "買ったものを冷蔵庫に入れて",
-    with: "レシートの写真",
     reply: "牛乳、卵、豆腐、長ねぎを冷蔵庫に入れました。",
+    caption: "レシートの写真を送ると、買ったものを冷蔵庫に入れてくれます。",
   },
   {
     label: "買い足し",
-    title: "冷蔵庫と見比べて、足りない分だけ",
     ask: "肉じゃがの材料のうち、冷蔵庫にないものを買い物リストに入れて",
     reply: "じゃがいもと玉ねぎは冷蔵庫にあったので、牛肉としらたきを買い物リストに入れました。",
+    caption: "冷蔵庫と見比べて、足りないものだけを買い物リストに入れてくれます。",
   },
   {
     label: "レシピ",
-    title: "気になったレシピを、URL でそのまま",
+    sent: { kind: "link", label: "www.kurashiru.com/recipes/…" },
     ask: "このレシピを登録して",
-    with: "レシピのページの URL",
     reply: "「鶏もも肉と白菜の味噌ミルク煮」を、主菜・煮込みのタグで登録しました。",
+    caption: "レシピのページの URL を送ると、レシピ集に登録してくれます。",
   },
   {
     label: "献立",
-    title: "作った記録から、今週の献立",
     ask: "しばらく作っていないレシピから、今週の夕飯を 3 つ選んで",
     reply: "豚汁（3 週間前）、ぶりのラーメン（1 か月前）、まだ作っていない味噌ミルク煮はどうでしょう。",
+    caption: "作った記録をもとに、献立を考えてくれます。",
   },
   {
     label: "振り返り",
-    title: "よく買うものも、すぐわかる",
     ask: "最近よく買っているものは？",
     reply: "この 1 か月だと、牛乳（4 回）、卵（3 回）、バナナ（3 回）です。",
+    caption: "買い物の記録から、よく買うものを教えてくれます。",
   },
 ];
 
@@ -78,24 +79,28 @@ export function Assistants() {
   );
 }
 
-// A row of cards like an app store's screenshots, swiped through sideways.
+// A row of cards like an app store's screenshots, swiped through sideways. The conversation is what
+// stands out; a sentence under it says what happened.
 function Shots() {
   const [copied, setCopied] = useState<string | null>(null);
   return (
     <section aria-labelledby="shots">
       <h2 id="shots">こんなふうに頼めます</h2>
       <ul className="plain shots">
-        {SHOTS.map(({ label, title, ask, with: along, reply }) => (
+        {SHOTS.map(({ label, ask, sent, reply, caption }) => (
           <li key={label} className="shot">
             <p className="shot-label">{label}</p>
-            <h3>{title}</h3>
             <div className="chat">
-              <p className="bubble me">
-                {along && <span className="attached">{along}</span>}
-                {ask}
-              </p>
+              {sent && (
+                <p className={`sent ${sent.kind}`}>
+                  {sent.kind === "photo" ? <PhotoIcon /> : <LinkIcon />}
+                  <span>{sent.label}</span>
+                </p>
+              )}
+              <p className="bubble me">{ask}</p>
               <p className="bubble ai">{reply}</p>
             </div>
+            <p className="shot-caption">{caption}</p>
             <button className="quiet" onClick={() => navigator.clipboard?.writeText(ask).then(() => setCopied(ask), () => {})}>
               {copied === ask ? "コピーしました" : "頼み方をコピー"}
             </button>
@@ -145,18 +150,25 @@ function Connect({ name }: { name: string }) {
       )}
       {!done && guide === "chatgpt" && (
         <div className="invite">
-          <p>ChatGPT のアプリでは追加できません。Safari などのブラウザで ChatGPT にログインして進めてください。</p>
+          <p>ChatGPT のアプリでは追加できません。スマホでもパソコンでも、ブラウザ（Chrome や Safari など）で ChatGPT にログインして進めてください。</p>
+          {/* The words in 「」 are ChatGPT's own, as its form shows them. */}
           <ol className="steps">
-            <li>下のボタンで ChatGPT のプラグインの画面を開く（アプリが開いたら、ブラウザで chatgpt.com を開き直す）</li>
+            <li>
+              ChatGPT のプラグインの画面を開く
+              <a className="button primary" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">
+                ChatGPT のプラグインを開く
+              </a>
+              <span className="note">ChatGPT のアプリが開いたら、ブラウザで chatgpt.com/plugins を開き直してください。</span>
+            </li>
             <li>右上の「追加」から「カスタム MCP サーバーを追加」を選ぶ</li>
-            <li>名前に「{name}」、サーバー URL に下の URL を入れる（認証は OAuth のまま）</li>
-            <li>「理解したうえで続けます」にチェックして、「プラグインとして作成」を押す</li>
+            <li>「名前」に「{name}」と入れる</li>
+            <li>
+              「接続タイプ」は「サーバーURL」のまま、その下の「https://example.com/mcp」と薄く出ている欄に、次の URL を貼り付ける
+              <McpUrl />
+            </li>
+            <li>「認証」は「OAuth」のまま。「理解したうえで続けます」にチェックして、「プラグインとして作成」を押す</li>
             <li>「{name}に接続」を押し、続く「接続を許可しますか？」の画面で許可する</li>
           </ol>
-          <McpUrl />
-          <a className="button" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">
-            ChatGPT を開く
-          </a>
         </div>
       )}
     </section>
@@ -212,12 +224,14 @@ function useNewConnection(guide: string | null): Connection | null {
   return added;
 }
 
+// The address to give the assistant, as text to copy rather than a field or a link, so it is not
+// opened in the browser by mistake.
 function McpUrl() {
   const [copied, setCopied] = useState(false);
   return (
-    <>
-      <input readOnly value={mcpUrl()} aria-label="接続先の URL" onFocus={(e) => e.currentTarget.select()} />
+    <span className="mcp-url">
+      <code aria-label="接続先の URL">{mcpUrl()}</code>
       <button onClick={() => navigator.clipboard?.writeText(mcpUrl()).then(() => setCopied(true), () => {})}>{copied ? "コピーしました" : "URL をコピー"}</button>
-    </>
+    </span>
   );
 }

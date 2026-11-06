@@ -24,3 +24,20 @@ export const GearIcon = () => (
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
+
+// A picture: a frame with a hill and the sun.
+export const PhotoIcon = () => (
+  <svg {...icon}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <circle cx="8.5" cy="10" r="1.5" />
+    <path d="M21 16l-5-5-8 8" />
+  </svg>
+);
+
+// Two links of a chain.
+export const LinkIcon = () => (
+  <svg {...icon}>
+    <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
+    <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+  </svg>
+);

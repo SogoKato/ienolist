@@ -44,6 +44,9 @@ export function createApp({ config, auth, items, recipes, oauth }: AppDeps) {
   // MCP clients: OAuth endpoints, and the MCP endpoint itself, which takes bearer tokens.
   app.route("/", oauthProtocolRoutes(oauth, config));
   app.use("/mcp", cors({ origin: "*", allowHeaders: ["authorization", "content-type", "mcp-protocol-version", "mcp-method", "mcp-name"], exposeHeaders: ["www-authenticate"] }));
+  // Someone who opened the address in a browser, instead of giving it to an assistant, sees how to
+  // connect one; MCP clients never navigate.
+  app.get("/mcp", (c, next) => (c.req.header("sec-fetch-mode") === "navigate" ? c.redirect("/assistants") : next()));
   app.all("/mcp", (c) =>
     handleMcpRequest(c.req.raw, {
       items,

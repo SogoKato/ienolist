@@ -122,6 +122,13 @@ test("an unauthenticated MCP call is told where to find the metadata", async () 
   }
 });
 
+test("the MCP address opened in a browser leads to how to connect an assistant", async () => {
+  const res = await request("GET", "/mcp", { headers: { "sec-fetch-mode": "navigate", accept: "text/html" } });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("location"), "/assistants");
+  assert.equal((await request("GET", "/mcp", { headers: { accept: "text/event-stream" } })).status, 401);
+});
+
 test("browsers on other origins may preflight the MCP endpoint", async () => {
   const res = await request("OPTIONS", "/mcp", { headers: { "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type,mcp-protocol-version" } });
   assert.equal(res.status, 204);
