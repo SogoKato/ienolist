@@ -336,6 +336,7 @@ test.describe("connecting an assistant", () => {
     await aki.getByRole("button", { name: "ChatGPT とつなぐ" }).click();
     await expect(aki.getByText("ChatGPT のアプリでは追加できません。", { exact: false })).toBeVisible();
     await expect(aki.getByLabel("接続先の URL")).toHaveValue("http://localhost:18787/mcp");
+    await expect(aki.getByRole("button", { name: "「牛乳と卵を買い物リストに入れて」" })).toBeVisible();
   });
 
   test("the connection is listed in the settings, and disconnecting cuts it off", async () => {

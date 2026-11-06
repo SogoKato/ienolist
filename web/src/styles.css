@@ -624,6 +624,27 @@ button.icon:active {
   margin: 0;
   padding-left: 1.4em;
 }
+/* What to ask an assistant: each example a card that copies it, what goes with it under it. */
+.examples h3 {
+  margin: 20px 0 8px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.examples ul {
+  display: grid;
+  gap: 8px;
+}
+button.example {
+  display: grid;
+  justify-content: start;
+  justify-items: start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 1rem;
+}
 /* One of a few answers (how much an assistant may do), each with what it means under it. */
 .choices {
   display: grid;

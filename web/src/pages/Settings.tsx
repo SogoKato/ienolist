@@ -29,6 +29,7 @@ export function Settings() {
       </p>
       <ErrorText>{error}</ErrorText>
       <Connections name={me.household.name} onError={setError} />
+      <Examples />
       <Passkeys onError={setError} />
       <Members admin={me.user.role === "admin"} selfId={me.user.id} onError={setError} />
       <section>
@@ -130,6 +131,60 @@ function McpUrl() {
       <input readOnly value={mcpUrl()} aria-label="接続先の URL" onFocus={(e) => e.currentTarget.select()} />
       <button onClick={() => navigator.clipboard?.writeText(mcpUrl()).then(() => setCopied(true), () => {})}>{copied ? "コピーしました" : "URL をコピー"}</button>
     </>
+  );
+}
+
+// What a connected assistant can be asked, in everyday words: what it can do is not obvious from
+// having connected it. `with` is what goes along with the words (a photo, a link).
+const EXAMPLES: { heading: string; asks: { text: string; with?: string }[] }[] = [
+  {
+    heading: "買い物と冷蔵庫",
+    asks: [
+      { text: "牛乳と卵を買い物リストに入れて" },
+      { text: "買ったものを冷蔵庫に移して" },
+      { text: "買ったものを冷蔵庫に入れて", with: "レシートの写真を添えて" },
+      { text: "冷蔵庫に何がある？使い切ったものは買い物リストに戻して" },
+    ],
+  },
+  {
+    heading: "レシピ",
+    asks: [
+      { text: "このレシピを登録して", with: "レシピのページの URL を添えて" },
+      { text: "この本のレシピとして登録して。42 ページ", with: "本のページの写真を添えて" },
+      { text: "肉じゃがの材料のうち、冷蔵庫にないものを買い物リストに入れて" },
+      { text: "しばらく作っていないレシピから、今週の夕飯を 3 つ選んで" },
+      { text: "今日は肉じゃがを作った、と記録して" },
+    ],
+  },
+  {
+    heading: "振り返り",
+    asks: [{ text: "最近よく買っているものは？" }, { text: "先月作った料理を教えて" }],
+  },
+];
+
+function Examples() {
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <section aria-labelledby="examples">
+      <h2 id="examples">アシスタントへの頼み方</h2>
+      <p className="muted">つないだアシスタントには、ふだんの言葉で頼めます。例を押すとコピーできます。</p>
+      {EXAMPLES.map(({ heading, asks }) => (
+        <div key={heading} className="examples">
+          <h3>{heading}</h3>
+          <ul className="plain">
+            {asks.map(({ text, with: along }) => (
+              <li key={text}>
+                <button className="example" onClick={() => navigator.clipboard?.writeText(text).then(() => setCopied(text), () => {})}>
+                  <span>「{text}」</span>
+                  {along && <span className="note">{along}</span>}
+                  {copied === text && <span className="note" role="status">コピーしました</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
   );
 }
 
