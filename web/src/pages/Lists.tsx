@@ -3,7 +3,7 @@ import { useSearch } from "wouter";
 import { api, type Item, type List } from "../api";
 import { MainTop } from "../nav";
 import { describeError } from "../passkeys";
-import { ErrorText } from "../ui";
+import { ErrorText, PencilIcon, TrashIcon } from "../ui";
 
 // Per list: which statuses mean "still to do" and "done", and the words for them.
 const LISTS = {
@@ -83,7 +83,7 @@ export function Lists() {
 
       <ul className="items">
         {open.map((item) => (
-          <Row key={item.id} item={item} list={list} onChange={replace} onRemove={remove} run={run} reload={load} />
+          <Row key={item.id} item={item} list={list} onChange={replace} onRemove={remove} run={run} />
         ))}
       </ul>
 
@@ -105,7 +105,7 @@ export function Lists() {
           </div>
           <ul className="items done">
             {done.map((item) => (
-              <Row key={item.id} item={item} list={list} onChange={replace} onRemove={remove} run={run} reload={load} />
+              <Row key={item.id} item={item} list={list} onChange={replace} onRemove={remove} run={run} />
             ))}
           </ul>
         </section>
@@ -139,10 +139,11 @@ type RowProps = {
   onChange(item: Item): void;
   onRemove(id: string): void;
   run(action: () => Promise<void>): Promise<void>;
-  reload(): Promise<void>;
 };
 
-function Row({ item, list, onChange, onRemove, run, reload }: RowProps) {
+// Ticking is the everyday action; editing and deleting sit at the end of the row. Moving to the
+// other list is done for all ticked items at once ("まとめて…へ移す").
+function Row({ item, list, onChange, onRemove, run }: RowProps) {
   const config = LISTS[list];
   const isDone = item.status === config.done;
   const [editing, setEditing] = useState(false);
@@ -194,34 +195,22 @@ function Row({ item, list, onChange, onRemove, run, reload }: RowProps) {
           {item.note && <span className="note">{item.note}</span>}
         </span>
       </label>
-      <details className="menu">
-        <summary aria-label={`${item.name} のメニュー`}>⋯</summary>
-        <div className="menu-items">
-          <button onClick={() => setEditing(true)}>編集</button>
-          <button
-            onClick={() =>
-              run(async () => {
-                await api.post<Item>(`/api/items/${item.id}/move`, { to: config.other });
-                await reload();
-              })
-            }
-          >
-            {config.moveLabel}
-          </button>
-          <button
-            className="danger"
-            onClick={() => {
-              if (!confirm(`「${item.name}」を削除しますか？`)) return;
-              run(async () => {
-                await api.delete(`/api/items/${item.id}`);
-                onRemove(item.id);
-              });
-            }}
-          >
-            削除
-          </button>
-        </div>
-      </details>
+      <button className="icon" aria-label={`${item.name} を編集`} onClick={() => setEditing(true)}>
+        <PencilIcon />
+      </button>
+      <button
+        className="icon"
+        aria-label={`${item.name} を削除`}
+        onClick={() => {
+          if (!confirm(`「${item.name}」を削除しますか？`)) return;
+          run(async () => {
+            await api.delete(`/api/items/${item.id}`);
+            onRemove(item.id);
+          });
+        }}
+      >
+        <TrashIcon />
+      </button>
     </li>
   );
 }

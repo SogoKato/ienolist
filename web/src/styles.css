@@ -400,7 +400,6 @@ section.row-actions {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
   min-height: 52px;
 }
 /* Rows are parted by a hairline that starts where the words do. */
@@ -476,6 +475,21 @@ section.row-actions {
 .done .name {
   color: var(--muted);
   text-decoration: line-through;
+}
+button.icon {
+  flex: none;
+  width: var(--control);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+button.icon:active {
+  background: var(--fill);
+}
+/* The last icon's drawing lines up with the row's edge; its target reaches into the margin. */
+.item > button.icon:last-child {
+  margin-right: -12px;
 }
 .section-bar {
   display: flex;

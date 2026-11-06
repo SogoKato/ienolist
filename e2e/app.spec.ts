@@ -37,10 +37,6 @@ const addItem = async (page: Page, placeholder: string, name: string) => {
   await page.getByLabel(placeholder).fill(name);
   await page.getByRole("button", { name: "追加", exact: true }).click();
 };
-const openMenu = async (page: Page, name: string, action: string) => {
-  await page.getByLabel(`${name} のメニュー`).click();
-  await page.getByRole("button", { name: action, exact: true }).click();
-};
 
 test("the first visitor is sent to set the app up, and ends up signed in with a passkey", async ({ browser }) => {
   ({ page: aki } = await person(browser));
@@ -71,21 +67,21 @@ test("items can be added, ticked off and moved to the fridge, and they stay afte
   await expect(aki.getByText("卵")).toHaveCount(0);
 });
 
-test("an item can be edited, moved back and deleted from its menu", async () => {
+test("an item can be edited, moved back with the ticked ones and deleted", async () => {
   await addItem(aki, "冷蔵庫にあるものを追加", "ヨーグルト");
-  await openMenu(aki, "ヨーグルト", "編集");
+  await aki.getByRole("button", { name: "ヨーグルト を編集" }).click();
   await aki.getByLabel("メモ").fill("プレーン");
   await aki.getByRole("button", { name: "保存" }).click();
   await expect(aki.getByText("プレーン")).toBeVisible();
 
   await aki.getByLabel("ヨーグルト を使い切った").check();
   await expect(aki.getByRole("region", { name: "使い切った" }).getByText("ヨーグルト")).toBeVisible();
-  await openMenu(aki, "ヨーグルト", "買い物リストへ移す");
+  await aki.getByRole("button", { name: "まとめて買い物リストへ移す" }).click();
   await expect(aki.getByText("ヨーグルト")).toHaveCount(0);
   await aki.getByRole("tab", { name: /買い物/ }).click();
   await expect(aki.getByText("ヨーグルト")).toBeVisible();
 
-  await openMenu(aki, "ヨーグルト", "削除");
+  await aki.getByRole("button", { name: "ヨーグルト を削除" }).click();
   await expect(aki.getByText("ヨーグルト")).toHaveCount(0);
 });
 
