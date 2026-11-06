@@ -165,7 +165,7 @@ export function Recipes() {
         </div>
       )}
       {tagNames.length > 0 && (
-        <div className="chips" role="group" aria-label="タグで絞る">
+        <div className="chips filter" role="group" aria-label="タグで絞る">
           {tagNames.map((t) => (
             <button key={t} className="chip" aria-pressed={selectedTags.includes(t)} onClick={() => toggleTag(t)}>
               {t}
@@ -180,18 +180,20 @@ export function Recipes() {
         <p className="muted center">{query.trim() || filtered ? "見つかりませんでした。" : "まだレシピがありません。"}</p>
       )}
 
-      <ul className="items">
+      <ul className="items recipe-list">
         {(recipes ?? []).map((r) => {
           const source = sourceText(r);
           return (
             <li key={r.id} className="item">
               <Link href={`/recipes/${r.id}`} className="recipe-link">
                 <span className="name">{r.title}</span>
-                <span className="note">
-                  {cookedText(r)}
-                  {source && ` ・ ${source}`}
+                <span className="recipe-meta">
+                  <span className="note">
+                    {cookedText(r)}
+                    {source && ` ・ ${source}`}
+                  </span>
+                  <Tags tags={r.tags} />
                 </span>
-                <Tags tags={r.tags} />
               </Link>
             </li>
           );
@@ -383,12 +385,6 @@ export function RecipeDetail({ id }: { id: string }) {
 
   return (
     <Page title={recipe.title} actions={<Link href="/recipes">レシピへ</Link>}>
-      {recipe.book && (
-        <p>
-          <Link href={filterPath([], recipe.book.id)}>『{recipe.book.title}』</Link>
-          {recipe.page && ` ${pageText(recipe.page)}`}
-        </p>
-      )}
       {recipe.tags.length > 0 && (
         <p className="tags">
           {recipe.tags.map((t) => (
@@ -398,8 +394,14 @@ export function RecipeDetail({ id }: { id: string }) {
           ))}
         </p>
       )}
+      {recipe.book && (
+        <p className="source">
+          <Link href={filterPath([], recipe.book.id)}>『{recipe.book.title}』</Link>
+          {recipe.page && ` ${pageText(recipe.page)}`}
+        </p>
+      )}
       {recipe.url && (
-        <p>
+        <p className="source">
           <a href={recipe.url} target="_blank" rel="noopener noreferrer">
             {hostOf(recipe.url)} で開く ↗
           </a>

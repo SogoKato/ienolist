@@ -92,6 +92,7 @@ export function Lists() {
           <div className="section-bar">
             <h2>{config.doneLabel}</h2>
             <button
+              className="quiet"
               onClick={() =>
                 run(async () => {
                   await Promise.all(done.map((item) => api.post<Item>(`/api/items/${item.id}/move`, { to: config.other })));

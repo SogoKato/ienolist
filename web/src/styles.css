@@ -1,26 +1,50 @@
+/* Colour has few roles: one deep green for what you act on, a pale green for labels, and warm
+   neutrals for everything else. Radii follow what a thing is: buttons and inputs, surfaces that
+   float (menus, panels), and round pills for what you pick or read as a label (tabs, chips, tags). */
 :root {
-  --bg: #f6f8f6;
+  --bg: #f7f6f2;
   --surface: #ffffff;
-  --text: #17211c;
-  --muted: #5d6b64;
-  --line: #d9e1dc;
-  --accent: #2f7d5b;
+  --fill: #eeede8;
+  --text: #1e2722;
+  --muted: #646b66;
+  --line: #e4e2dc;
+  --line-strong: #d5d2ca;
+  --line-control: #8a908b;
+  --accent: #2d6a4f;
+  --accent-pressed: #24573f;
   --accent-text: #ffffff;
-  --danger: #b3261e;
+  --accent-soft: #e6eee8;
+  --accent-soft-text: #2d6a4f;
+  --danger: #b42318;
+  --shadow: 0 8px 24px rgb(30 39 34 / 0.12);
+
+  --gutter: 20px;
+  --control: 44px;
+  --radius: 10px;
+  --radius-surface: 14px;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101713;
-    --surface: #18211c;
-    --text: #e8efeb;
-    --muted: #9bada3;
-    --line: #2a3832;
-    --accent: #4aa57d;
-    --accent-text: #08130e;
+    --bg: #121613;
+    --surface: #1b201c;
+    --fill: #232924;
+    --text: #e6ebe7;
+    --muted: #9aa49d;
+    --line: #272d29;
+    --line-strong: #363d38;
+    --line-control: #6b746e;
+    --accent: #6aa886;
+    --accent-pressed: #5d9677;
+    --accent-text: #0c1611;
+    --accent-soft: #1f2c24;
+    --accent-soft-text: #a3cdb5;
     --danger: #f2b8b5;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
   }
 }
+
+/* --- base ------------------------------------------------------------------------------ */
 
 * {
   box-sizing: border-box;
@@ -34,135 +58,130 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font: 16px/1.6 system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
-.page {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 0 16px calc(32px + env(safe-area-inset-bottom));
-}
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: calc(12px + env(safe-area-inset-top)) 0 8px;
+/* Headings set their kana a little tighter, the way Japanese titles are usually typeset. */
+h1,
+h2 {
+  margin: 0;
+  font-feature-settings: "palt";
+  letter-spacing: 0.02em;
 }
 h1 {
-  font-size: 1.35rem;
-  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.35;
+  font-weight: 700;
 }
 h2 {
-  font-size: 1.1rem;
-  margin: 0 0 4px;
+  margin-bottom: 8px;
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+p {
+  margin: 12px 0;
 }
 section {
-  margin-top: 28px;
+  margin-top: 32px;
 }
 a {
   color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 .muted {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
 }
 .center {
   text-align: center;
-  margin-top: 32px;
+  margin-top: 48px;
 }
 .error {
   color: var(--danger);
-  margin: 8px 0;
+  font-size: 0.875rem;
+  margin: 12px 0;
 }
 .stack {
   display: grid;
-  gap: 12px;
-}
-label {
-  display: grid;
-  gap: 4px;
-  font-size: 0.9rem;
-}
-input[type="text"],
-input:not([type]),
-input[type="password"] {
-  font: inherit;
-}
-input:not([type="checkbox"]),
-textarea {
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-}
-button {
-  font: inherit;
-  min-height: 44px;
-  padding: 8px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
-  font-weight: 600;
-}
-button.danger {
-  color: var(--danger);
-}
-button.wide {
-  width: 100%;
+  gap: 16px;
 }
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-textarea {
-  min-height: 12rem;
-  resize: vertical;
-  line-height: 1.6;
+code {
+  overflow-wrap: anywhere;
+}
+
+/* --- page and header ----------------------------------------------------------------------- */
+
+.page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 var(--gutter) calc(40px + env(safe-area-inset-bottom));
+}
+.bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: calc(16px + env(safe-area-inset-top)) 0 12px;
+}
+.bar h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bar a {
+  flex: none;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  /* A bigger target than the word, without moving it. */
+  padding: 10px 0 10px 12px;
+  margin: -10px 0;
+}
+.bar a:active {
+  opacity: 0.6;
+}
+.bar + .tags,
+.bar + .source {
+  margin-top: 4px;
+}
+
+/* The main pages' header, tabs and box stay at the top; the list scrolls under them. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 0 var(--gutter) 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin: 8px 0 12px;
-}
-.tab,
-a.button {
-  min-height: 44px;
-  padding: 8px 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  text-decoration: none;
-}
-a.button.primary {
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
-  font-weight: 600;
+  margin: 4px 0 12px;
 }
 .tab {
   display: flex;
-  justify-content: center;
-  gap: 8px;
   align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control);
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+.tab:active {
+  background: var(--fill);
 }
 .tab.active {
   background: var(--accent);
@@ -170,198 +189,195 @@ a.button.primary {
   color: var(--accent-text);
   font-weight: 600;
 }
+.tab.active:active {
+  background: var(--accent-pressed);
+}
 .count {
-  font-size: 0.8rem;
-  opacity: 0.85;
-}
-.add {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.add input {
-  flex: 1;
-  min-width: 0;
-}
-.items,
-.plain {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 12px;
-  margin-top: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-.item.editing {
-  display: block;
-  padding: 12px;
-}
-.check {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  align-items: center;
-  gap: 12px;
-  font-size: 1rem;
-  min-height: 44px;
-  cursor: pointer;
-}
-.check input {
-  width: 22px;
-  height: 22px;
-  flex: none;
-  accent-color: var(--accent);
-}
-.text {
-  display: grid;
-  min-width: 0;
-}
-.name {
-  overflow-wrap: anywhere;
-}
-.note {
   color: var(--muted);
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
-.done .name {
-  text-decoration: line-through;
-  color: var(--muted);
+.tab.active .count {
+  color: inherit;
+  opacity: 0.8;
 }
-.menu {
-  position: relative;
-}
-.menu summary {
+.pull {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 1.3rem;
+  height: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  transition: height 0.2s ease;
 }
-.menu summary::-webkit-details-marker {
-  display: none;
-}
-.menu-items {
-  position: absolute;
-  right: 0;
-  z-index: 2;
+
+/* --- inputs and buttons ---------------------------------------------------------------------- */
+
+label {
   display: grid;
-  min-width: 11rem;
-  gap: 4px;
-  padding: 8px;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+input:not([type="checkbox"]),
+textarea,
+select {
+  width: 100%;
+  min-height: var(--control);
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--fill);
+  color: var(--text);
+  font: inherit;
+  /* Anything smaller and iOS zooms in on focus. */
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+input:not([type="checkbox"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
 }
-.section-bar,
-.row-actions,
-.rows li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+input:disabled {
+  opacity: 0.5;
 }
-.section-bar {
-  justify-content: space-between;
-  margin-top: 24px;
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
 }
-.rows li {
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
+input[type="date"] {
+  text-align: left;
 }
-.rows li > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
 }
-.invite {
-  margin-top: 12px;
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-code {
-  overflow-wrap: anywhere;
-}
-.recipe-link {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 6px 0;
-  align-content: center;
-  color: inherit;
-  text-decoration: none;
-}
-.body-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  padding: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-.cook {
-  margin-top: 20px;
+textarea {
+  min-height: 12rem;
+  resize: vertical;
+  line-height: 1.75;
 }
 select {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23878e89' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  text-overflow: ellipsis;
+}
+
+button,
+a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control);
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  text-decoration: none;
+  cursor: pointer;
 }
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+button:active {
+  background: var(--fill);
 }
-.chip {
-  min-height: 36px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 0.9rem;
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
-.chip[aria-pressed="true"] {
+button.primary,
+a.button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
+  font-weight: 600;
 }
-.tags {
+button.primary:active,
+a.button.primary:active {
+  background: var(--accent-pressed);
+  border-color: var(--accent-pressed);
+}
+button.danger {
+  color: var(--danger);
+}
+button.wide {
+  width: 100%;
+}
+/* Secondary actions that should not compete with the list: just words, in the accent colour,
+   or grey for the per-row ones (removing a record, a passkey or a connection). */
+button.quiet,
+.rows button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+  padding: 0 8px;
+}
+.rows button {
+  color: var(--muted);
+}
+button.quiet:active,
+.rows button:active {
+  background: var(--fill);
+}
+/* At the end of a row the words line up with the row's edge, not with their padding. */
+.section-bar button.quiet,
+.rows button {
+  margin-right: -8px;
+}
+@media (hover: hover) {
+  button:hover:not(:disabled),
+  .tab:hover,
+  .menu summary:hover {
+    background: var(--fill);
+  }
+  button.primary:hover:not(:disabled),
+  a.button.primary:hover,
+  .tab.active:hover,
+  .chip[aria-pressed="true"]:hover {
+    background: var(--accent-pressed);
+  }
+}
+
+.add {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.add input,
+.add select {
+  flex: 1;
+  min-width: 0;
+}
+.add > button,
+.add > .button {
+  flex: none;
+  white-space: nowrap;
+}
+.top .add,
+.stack > .add {
+  margin: 0;
+}
+.row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 2px;
+  align-items: center;
+  gap: 8px;
 }
-.tag {
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.8rem;
-  text-decoration: none;
-}
-a.tag {
-  padding: 4px 12px;
-  color: var(--accent);
-  font-size: 0.9rem;
+section.row-actions {
+  margin-top: 40px;
 }
 .grow {
   flex: 1;
@@ -371,25 +387,308 @@ a.tag {
   width: 6.5rem;
   flex: none;
 }
-/* The main pages' header, tabs and box stay at the top; the list scrolls under them. */
-.top {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  margin: 0 -16px;
-  padding: 0 16px 4px;
-  background: var(--bg);
+
+/* --- lists ---------------------------------------------------------------------------------- */
+
+.items,
+.plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+}
+/* Rows are parted by a hairline that starts where the words do. */
+.item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 36px;
+  right: 0;
+  bottom: 0;
   border-bottom: 1px solid var(--line);
 }
-.top .add {
-  margin-bottom: 4px;
+.item.editing {
+  display: block;
+  padding: 12px 0 16px;
 }
-.pull {
+.check {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 6px 0;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.check input {
+  display: grid;
+  place-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1.5px solid var(--line-control);
+  border-radius: 6px;
+  background: var(--surface);
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+.check input::after {
+  content: "";
+  width: 6px;
+  height: 11px;
+  margin-top: -2px;
+  border: solid var(--accent-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+}
+.check input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.check input:checked::after {
+  opacity: 1;
+}
+.text {
+  display: grid;
+  min-width: 0;
+}
+.name {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.done .name {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.section-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.section-bar h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+}
+
+.menu {
+  position: relative;
+}
+.menu summary {
   display: grid;
   place-items: center;
-  height: 0;
-  overflow: hidden;
+  width: var(--control);
+  height: var(--control);
+  border-radius: var(--radius);
   color: var(--muted);
-  font-size: 0.85rem;
-  transition: height 0.2s ease;
+  font-size: 1.25rem;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+}
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+.menu summary:active,
+.menu[open] summary {
+  background: var(--fill);
+}
+.menu-items {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 12rem;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow);
+}
+.menu-items button {
+  justify-content: flex-start;
+  padding: 0 12px;
+  border-color: transparent;
+  border-radius: calc(var(--radius-surface) - 6px);
+  background: transparent;
+  text-align: left;
+}
+.menu-items button:active {
+  background: var(--fill);
+}
+
+/* Settings and cook records: a line per thing, its action as words at the end. */
+.rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rows li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rows strong {
+  display: block;
+  font-weight: 600;
+}
+.rows button {
+  flex: none;
+}
+.rows + button {
+  margin-top: 12px;
+}
+.invite {
+  margin-top: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+}
+.invite p {
+  margin: 0;
+}
+
+/* --- recipes ---------------------------------------------------------------------------------- */
+
+.recipe-list .item::after {
+  left: 0;
+}
+.recipe-link {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 28px 14px 0;
+  color: inherit;
+  text-decoration: none;
+}
+/* The disclosure mark iOS lists use, in place of the card's frame, to say the row opens. */
+.recipe-link::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border: solid var(--line-control);
+  border-width: 1.5px 1.5px 0 0;
+  transform: translateY(-50%) rotate(45deg);
+}
+.recipe-link:active {
+  opacity: 0.6;
+}
+.recipe-link .name {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  font-feature-settings: "palt";
+  letter-spacing: 0.02em;
+}
+.recipe-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tag {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  font-size: 0.75rem;
+  line-height: 1.75;
+  text-decoration: none;
+}
+a.tag {
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  line-height: 2.4;
+}
+a.tag:active {
+  opacity: 0.7;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* The collection's tag filter is one line that scrolls sideways, out to the screen's edges. */
+.chips.filter {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--gutter)) 4px;
+  padding: 0 var(--gutter);
+  scrollbar-width: none;
+}
+.chips.filter::-webkit-scrollbar {
+  display: none;
+}
+.chips.filter::after {
+  content: "";
+  flex: none;
+  width: 1px;
+}
+.chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+}
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.source {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.source a {
+  text-decoration: none;
+}
+.body-text {
+  margin: 20px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  line-height: 1.85;
+  letter-spacing: 0.02em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cook {
+  margin-top: 28px;
 }
