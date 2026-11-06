@@ -96,9 +96,11 @@ test("signing out and back in with the passkey brings the lists back", async () 
   await expect(aki).toHaveURL(/\/login\?next=%2Fsettings$/);
   await aki.getByRole("button", { name: "パスキーでログイン" }).click();
   await expect(aki).toHaveURL(/\/settings$/);
-  // The settings keep the top: the gear is lit instead of a tab, and the tabs lead to the lists.
-  await expect(aki.getByRole("link", { name: "設定" })).toHaveAttribute("aria-current", "page");
+  // The settings keep the top, with the gear lit instead of a tab. Opened by their address, not
+  // the gear, the gear closes them to the shopping list.
   await expect(aki.getByRole("tab", { selected: true })).toHaveCount(0);
+  await aki.getByRole("link", { name: "設定を閉じる" }).click();
+  await expect(aki).toHaveURL(/\/$/);
   await aki.getByRole("tab", { name: /冷蔵庫/ }).click();
   await expect(aki).toHaveURL(/\/\?list=fridge$/);
   await expect(aki.getByText("牛乳")).toBeVisible();
@@ -129,6 +131,10 @@ test("an invited family member joins on their own device and sees the same lists
 });
 
 test("a change made on one device shows on the other after a tap on the current tab or a pull", async () => {
+  // The gear again closes the settings, back to the page it opened them from, even after the
+  // reload above.
+  await aki.getByRole("link", { name: "設定を閉じる" }).click();
+  await expect(aki).toHaveURL(/\/\?list=fridge$/);
   await aki.getByRole("tab", { name: /買い物/ }).click();
   await expect(aki.getByText("読み込み中…")).toHaveCount(0);
   await ben.goto("/");

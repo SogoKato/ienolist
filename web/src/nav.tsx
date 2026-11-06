@@ -69,21 +69,32 @@ export function Top({ at, counts = {}, onCurrent, children }: { at: Section | "s
   useEffect(() => {
     if (at !== "settings") left[at] = here;
   }, [at, here]);
+  // The settings' entry in the history says which page the gear opened them from.
+  const from = (history.state as { from?: string } | null)?.from;
   return (
     <div className="top">
       <header className="bar">
         <h1>家のリスト</h1>
-        <Link
-          href="/settings"
-          className="icon-link"
-          aria-label="設定"
-          aria-current={at === "settings" ? "page" : undefined}
-          onClick={(event) => {
-            if (at === "settings") event.preventDefault();
-          }}
-        >
-          <GearIcon />
-        </Link>
+        {at === "settings" ? (
+          // There the gear closes them: back to that page, or to the shopping list when they were
+          // opened some other way (by their address, after signing in).
+          <Link
+            href={from ?? "/"}
+            className="icon-link active"
+            aria-label="設定を閉じる"
+            onClick={(event) => {
+              event.preventDefault();
+              if (from) history.back();
+              else navigate("/", { replace: true });
+            }}
+          >
+            <GearIcon />
+          </Link>
+        ) : (
+          <Link href="/settings" state={{ from: here }} className="icon-link" aria-label="設定">
+            <GearIcon />
+          </Link>
+        )}
       </header>
       {/* Links, so the back button and reloads keep the place. */}
       <nav className="tabs" role="tablist">

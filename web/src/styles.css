@@ -153,11 +153,14 @@ code {
 .icon-link:active {
   background: var(--fill);
 }
-/* On the settings page the gear is lit, like the current tab but in the pale green. */
-.icon-link[aria-current="page"] {
+/* On the settings page the gear is lit, like the current tab but in the pale green, and closes them. */
+.icon-link.active {
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
+}
+.icon-link.active:active {
+  opacity: 0.7;
 }
 /* A page under the top (the settings, a recipe) has its own title below it. */
 .top + .bar {
