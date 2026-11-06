@@ -1,22 +1,27 @@
-/* Colour has few roles: one deep green for what you act on, a pale green for labels, and warm
-   neutrals for everything else. Radii follow what a thing is: buttons and inputs, surfaces that
-   float (menus, panels), and round pills for what you pick or read as a label (tabs, chips, tags). */
+/* Colour has few roles: one terracotta for what you act on, a pale peach for labels, and warm
+   neutrals for everything else. The terracotta is a fill (--accent: the current tab, the main
+   button, a ticked box) and words and outlines on the page (--accent-ink: links, the focus ring);
+   in the dark the two part, a calm fill and a lighter ink, so that nothing glows. The red for
+   deleting leans to crimson, away from the terracotta. Radii follow what a thing is: buttons and
+   inputs, surfaces that float (menus, panels), and round pills for what you pick or read as a
+   label (tabs, chips, tags). */
 :root {
-  --bg: #f7f6f2;
+  --bg: #f8f5f0;
   --surface: #ffffff;
-  --fill: #eeede8;
-  --text: #1e2722;
-  --muted: #646b66;
-  --line: #e4e2dc;
-  --line-strong: #d5d2ca;
-  --line-control: #8a908b;
-  --accent: #2d6a4f;
-  --accent-pressed: #24573f;
+  --fill: #f0ece5;
+  --text: #2b2521;
+  --muted: #6f665f;
+  --line: #e8e2d9;
+  --line-strong: #dad2c6;
+  --line-control: #968b80;
+  --accent: #a14b2c;
+  --accent-pressed: #883f25;
   --accent-text: #ffffff;
-  --accent-soft: #e6eee8;
-  --accent-soft-text: #2d6a4f;
-  --danger: #b42318;
-  --shadow: 0 8px 24px rgb(30 39 34 / 0.12);
+  --accent-ink: #a14b2c;
+  --accent-soft: #f7e7de;
+  --accent-soft-text: #964323;
+  --danger: #a8213f;
+  --shadow: 0 8px 24px rgb(43 37 33 / 0.12);
 
   --gutter: 20px;
   --control: 44px;
@@ -26,21 +31,22 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #121613;
-    --surface: #1b201c;
-    --fill: #232924;
-    --text: #e6ebe7;
-    --muted: #9aa49d;
-    --line: #272d29;
-    --line-strong: #363d38;
-    --line-control: #6b746e;
-    --accent: #6aa886;
-    --accent-pressed: #5d9677;
-    --accent-text: #0c1611;
-    --accent-soft: #1f2c24;
-    --accent-soft-text: #a3cdb5;
-    --danger: #f2b8b5;
-    --shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+    --bg: #201d1b;
+    --surface: #2a2624;
+    --fill: #322d2a;
+    --text: #e1dbd3;
+    --muted: #a79e95;
+    --line: #36312e;
+    --line-strong: #49423d;
+    --line-control: #877d73;
+    --accent: #9c573f;
+    --accent-pressed: #8a4d38;
+    --accent-text: #fff6f0;
+    --accent-ink: #e2a083;
+    --accent-soft: #3a2c25;
+    --accent-soft-text: #e5b49d;
+    --danger: #eea2b0;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   }
 }
 
@@ -87,7 +93,7 @@ section {
   margin-top: 32px;
 }
 a {
-  color: var(--accent);
+  color: var(--accent-ink);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
@@ -109,7 +115,7 @@ a {
   gap: 16px;
 }
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-ink);
   outline-offset: 2px;
 }
 code {
@@ -153,11 +159,11 @@ code {
 .icon-link:active {
   background: var(--fill);
 }
-/* On the settings page the gear is lit, like the current tab but in the pale green, and closes them. */
+/* On the settings page the gear is lit, like the current tab but in the pale peach, and closes them. */
 .icon-link.active {
   border-radius: 999px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-soft-text);
 }
 .icon-link.active:active {
   opacity: 0.7;
@@ -267,7 +273,7 @@ input:not([type="checkbox"]):focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
   background: var(--surface);
 }
 input:disabled {
@@ -289,7 +295,7 @@ textarea {
 }
 select {
   padding-right: 40px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23878e89' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23908680' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 16px center;
   text-overflow: ellipsis;
@@ -343,7 +349,7 @@ button.quiet,
 .rows button {
   border-color: transparent;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-ink);
   padding: 0 8px;
 }
 .rows button {
