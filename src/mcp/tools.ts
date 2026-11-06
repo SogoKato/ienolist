@@ -42,6 +42,7 @@ const listItems = defineTool<Ctx, any>({
   name: "list_items",
   description:
     "List the household's items, oldest first. Two lists: 'shopping' (what to buy) and 'fridge' (what is at home, to avoid buying it twice). " +
+    "This is only how things are now: for what happened before (what is bought often, when something ran out), use list_item_history. " +
     STATUS_HELP,
   scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
@@ -87,7 +88,7 @@ const createItem = defineTool<Ctx, any>({
 const updateItem = defineTool<Ctx, any>({
   name: "update_item",
   description:
-    "Change an item's name, status or note; only the given fields change. The previous values stay in the history (list_events). " +
+    "Change an item's name, status or note; only the given fields change. The previous values stay in the history (list_item_history). " +
     "Use this to check things off (shopping: bought) or mark them finished (fridge: used_up). " +
     STATUS_HELP,
   scope: SCOPE_WRITE,
@@ -105,7 +106,7 @@ const updateItem = defineTool<Ctx, any>({
 
 const deleteItem = defineTool<Ctx, any>({
   name: "delete_item",
-  description: "Delete an item permanently. Its history (list_events) is kept.",
+  description: "Delete an item permanently. Its history (list_item_history) is kept.",
   scope: SCOPE_WRITE,
   annotations: { destructiveHint: true },
   input: z.object({ id }),
@@ -128,11 +129,12 @@ const moveItem = defineTool<Ctx, any>({
   },
 });
 
-const listEvents = defineTool<Ctx, any>({
-  name: "list_events",
+const listItemHistory = defineTool<Ctx, any>({
+  name: "list_item_history",
   description:
-    "The history of changes (created, renamed, status_changed, note_changed, moved, deleted), newest first. " +
-    "Useful for what is bought often, what ran out, or who changed what. Deleted items keep their events.",
+    "The past of the shopping list and fridge, newest first: each time an item was added (created), renamed, bought or used up (status_changed), " +
+    "had its note changed, moved between the lists, or deleted. Useful for what is bought often, when something last ran out, or who changed what. " +
+    "Deleted items keep their history. Recipes have none here; what was cooked when is in list_cooks.",
   scope: SCOPE_READ,
   annotations: { readOnlyHint: true },
   input: z.object({
@@ -358,7 +360,7 @@ const deleteBook = defineTool<Ctx, any>({
 });
 
 export const tools = [
-  listItems, getItem, createItem, updateItem, deleteItem, moveItem, listEvents,
+  listItems, getItem, createItem, updateItem, deleteItem, moveItem, listItemHistory,
   listRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe, recordCook, listCooks, deleteCook,
   listTags, renameTag, listBooks, renameBook, deleteBook,
 ] as ToolDef<Ctx>[];

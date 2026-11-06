@@ -227,7 +227,7 @@
 | `update_item` | 品名、状態、メモの更新 | `write` |
 | `delete_item` | 削除 | `write` |
 | `move_item` | 別のリストへ移動 | `write` |
-| `list_events` | 変更履歴の取得 | `read` |
+| `list_item_history` | 変更履歴の取得 | `read` |
 | `list_recipes` | レシピの一覧（検索、タグ、本で絞り込み。本文を含めるかを選べる） | `read` |
 | `get_recipe` | 1 件取得（本文、出典、タグ、作った回数、最後に作った日） | `read` |
 | `create_recipe` | 追加（料理名、リンク、本とページ、タグ、本文） | `write` |

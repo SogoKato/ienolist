@@ -68,7 +68,7 @@ test("modern: server/discover and tools/list", async () => {
   assert.equal(list.resultType, "complete");
   assert.equal(list.cacheScope, "private");
   assert.deepEqual(list.tools.map((t: { name: string }) => t.name), [
-    "list_items", "get_item", "create_item", "update_item", "delete_item", "move_item", "list_events",
+    "list_items", "get_item", "create_item", "update_item", "delete_item", "move_item", "list_item_history",
     "list_recipes", "get_recipe", "create_recipe", "update_recipe", "delete_recipe", "record_cook", "list_cooks", "delete_cook",
     "list_tags", "rename_tag", "list_books", "rename_book", "delete_book",
   ]);
@@ -130,14 +130,14 @@ test("tools work end to end in the modern protocol", async () => {
   assert.deepEqual(data(await modernCall("list_items", { list: "shopping" })).items.map((i: { id: string }) => i.id), [created.id]);
   assert.deepEqual(data(await modernCall("list_items", { list: "fridge" })).items, []);
 
-  const events = data(await modernCall("list_events", { itemId: created.id })).events;
+  const events = data(await modernCall("list_item_history", { itemId: created.id })).events;
   assert.deepEqual(events.map((e: { type: string }) => e.type), ["moved", "note_changed", "status_changed", "created"]);
   assert.equal(events[0].source, "mcp");
   assert.deepEqual(events[0].data.to, { list: "shopping", status: "to_buy" });
-  assert.equal(data(await modernCall("list_events", { since: "2999-01-01T00:00:00Z" })).events.length, 0);
+  assert.equal(data(await modernCall("list_item_history", { since: "2999-01-01T00:00:00Z" })).events.length, 0);
 
   assert.deepEqual(data(await modernCall("delete_item", { id: created.id })), { deleted: created.id });
-  assert.equal(data(await modernCall("list_events", { limit: 1 })).events[0].type, "deleted");
+  assert.equal(data(await modernCall("list_item_history", { limit: 1 })).events[0].type, "deleted");
 });
 
 test("tools also work in the legacy protocol", async () => {
@@ -157,8 +157,8 @@ test("tool errors are reported as tool results the model can act on", async () =
   assert.match(await err("create_item", { list: "fridge", name: "x", status: "bought" }), /status for the fridge list must be one of: in_stock, used_up/);
   assert.match(await err("update_item", { id: "nope", name: "x" }), /^Item not found$/);
   assert.match(await err("update_item", { id: "nope" }), /Nothing to update/);
-  assert.match(await err("list_events", { since: "yesterday" }), /^Invalid arguments: since/);
-  assert.match(await err("list_events", { limit: 0 }), /^Invalid arguments: limit/);
+  assert.match(await err("list_item_history", { since: "yesterday" }), /^Invalid arguments: since/);
+  assert.match(await err("list_item_history", { limit: 0 }), /^Invalid arguments: limit/);
   const item = data(await modernCall("create_item", { list: "fridge", name: "egg" }));
   assert.match(await err("move_item", { id: item.id, to: "fridge" }), /already on the fridge list/);
 });
@@ -186,7 +186,7 @@ test("scopes: read-only principals cannot call write tools, and are told how to 
   const created = data(await modernCall("create_item", { list: "fridge", name: "egg" }));
   principal = { actor: claude, scopes: ["read"] };
   assert.equal(data(await modernCall("list_items")).items.length, 1);
-  assert.equal(data(await modernCall("list_events")).events.length, 1);
+  assert.equal(data(await modernCall("list_item_history")).events.length, 1);
   for (const [name, args] of [["create_item", { list: "fridge", name: "x" }], ["update_item", { id: created.id, name: "x" }], ["move_item", { id: created.id, to: "shopping" }], ["delete_item", { id: created.id }]] as const) {
     const r = await modernCall(name, args);
     assert.deepEqual([r.isError, r.content[0].text], [true, missingScope()], name);
@@ -202,7 +202,7 @@ test("a household's tokens only reach its own items", async () => {
   assert.deepEqual(data(await modernCall("list_items")).items, []);
   assert.equal((await modernCall("get_item", { id: mine.id })).content[0].text, "Item not found");
   assert.equal((await modernCall("delete_item", { id: mine.id })).isError, true);
-  assert.deepEqual(data(await modernCall("list_events")).events, []);
+  assert.deepEqual(data(await modernCall("list_item_history")).events, []);
 });
 
 test("only POST reaches the tools", async () => {
@@ -229,8 +229,8 @@ test("input limits are enforced on the way in", async () => {
   assert.match(await err("create_item", { list: "fridge", name: "x", note: "n".repeat(2001) }), /^Invalid arguments: note/);
   assert.match(await err("get_item", { id: "x".repeat(65) }), /^Invalid arguments: id/);
   assert.match(await err("get_item", { id: "" }), /^Invalid arguments: id/);
-  assert.match(await err("list_events", { limit: 501 }), /^Invalid arguments: limit/);
-  assert.match(await err("list_events", { limit: 1.5 }), /^Invalid arguments: limit/);
+  assert.match(await err("list_item_history", { limit: 501 }), /^Invalid arguments: limit/);
+  assert.match(await err("list_item_history", { limit: 1.5 }), /^Invalid arguments: limit/);
   assert.match(await err("move_item", { id: "x", to: "pantry" }), /^Invalid arguments: to/);
   // Whitespace passes the schema but not the service, which trims first.
   assert.match(await err("create_item", { list: "fridge", name: "   " }), /^name must be 1-500 characters$/);
@@ -262,7 +262,7 @@ test("japanese names and notes survive the round trip", async () => {
   const created = data(await modernCall("create_item", { list: "fridge", name: "牛乳", note: "特売 🥛 2本" }));
   const fetched = data(await modernCall("get_item", { id: created.id }));
   assert.deepEqual([fetched.name, fetched.note], ["牛乳", "特売 🥛 2本"]);
-  assert.equal(data(await modernCall("list_events")).events[0].name, "牛乳");
+  assert.equal(data(await modernCall("list_item_history")).events[0].name, "牛乳");
 });
 
 test("the history records which client made each change", async () => {
