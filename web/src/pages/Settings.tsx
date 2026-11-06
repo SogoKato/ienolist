@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { api, type Connection, type Member, type Passkey } from "../api";
+import { BackLink } from "../nav";
 import { describeError, guessDeviceName, registerPasskey } from "../passkeys";
 import { useSession } from "../session";
 import { ErrorText, formatDate, Page } from "../ui";
@@ -23,7 +24,7 @@ export function Settings() {
   }
 
   return (
-    <Page title="設定" actions={<Link href="/">リストへ</Link>}>
+    <Page title="設定" back={<BackLink fallback="/" />}>
       <p>
         {me.household.name} / {me.user.displayName} さん{me.user.role === "admin" ? "(管理者)" : ""}
       </p>

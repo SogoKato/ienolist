@@ -3,7 +3,8 @@ import { useSearch } from "wouter";
 import { api, type Item, type List } from "../api";
 import { MainTop } from "../nav";
 import { describeError } from "../passkeys";
-import { ErrorText, PencilIcon, TrashIcon } from "../ui";
+import { PencilIcon, TrashIcon } from "../icons";
+import { ErrorText } from "../ui";
 
 // Per list: which statuses mean "still to do" and "done", and the words for them.
 const LISTS = {

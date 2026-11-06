@@ -96,7 +96,8 @@ test("signing out and back in with the passkey brings the lists back", async () 
   await expect(aki).toHaveURL(/\/login\?next=%2Fsettings$/);
   await aki.getByRole("button", { name: "パスキーでログイン" }).click();
   await expect(aki).toHaveURL(/\/settings$/);
-  await aki.getByRole("link", { name: "リストへ" }).click();
+  await aki.getByRole("link", { name: "戻る" }).click();
+  await expect(aki).toHaveURL(/\/$/);
   await aki.getByRole("tab", { name: /冷蔵庫/ }).click();
   await expect(aki.getByText("牛乳")).toBeVisible();
 });
@@ -126,7 +127,10 @@ test("an invited family member joins on their own device and sees the same lists
 });
 
 test("a change made on one device shows on the other after a tap on the current tab or a pull", async () => {
-  await aki.getByRole("link", { name: "リストへ" }).click();
+  // The settings were opened from the fridge tab, so going back returns there.
+  await aki.getByRole("link", { name: "戻る" }).click();
+  await expect(aki).toHaveURL(/\/\?list=fridge$/);
+  await aki.getByRole("tab", { name: /買い物/ }).click();
   await expect(aki.getByText("読み込み中…")).toHaveCount(0);
   await ben.goto("/");
   await ben.getByRole("tab", { name: /買い物/ }).click();
@@ -167,7 +171,7 @@ test("a recipe is added with a link and notes, found by an ingredient, cooked to
   await aki.getByRole("button", { name: "保存" }).click();
   await expect(aki.getByRole("heading", { name: "バターチキンカレー" })).toBeVisible();
 
-  await aki.getByRole("link", { name: "レシピへ" }).click();
+  await aki.getByRole("link", { name: "戻る" }).click();
   await aki.getByLabel("レシピを探す").fill("玉ねぎ");
   await expect(aki.getByRole("link", { name: /バターチキンカレー.*1回/ })).toBeVisible();
   await aki.getByLabel("レシピを探す").fill("豚肉");
@@ -218,6 +222,13 @@ test("recipes from a book carry its page and tags, and the collection filters by
   await expect(list.getByRole("link")).toHaveCount(1);
   await expect(list.getByRole("link", { name: /唐揚げ.*『茅乃舎 レシピ冊子』 p\.12/ })).toBeVisible();
   await aki.reload();
+  await expect(tags.getByRole("button", { name: "主菜" })).toHaveAttribute("aria-pressed", "true");
+  await expect(list.getByRole("link")).toHaveCount(1);
+
+  // Back from a recipe is back to the list as it was filtered.
+  await list.getByRole("link", { name: /唐揚げ/ }).click();
+  await expect(aki.getByRole("heading", { name: "唐揚げ" })).toBeVisible();
+  await aki.getByRole("link", { name: "戻る" }).click();
   await expect(tags.getByRole("button", { name: "主菜" })).toHaveAttribute("aria-pressed", "true");
   await expect(list.getByRole("link")).toHaveCount(1);
 });

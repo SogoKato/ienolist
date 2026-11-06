@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { navigate as browserNavigate, usePathname } from "wouter/use-browser-location";
+import { BackIcon, GearIcon } from "./icons";
 
 export type Section = "shopping" | "fridge" | "recipes";
 
@@ -28,7 +30,7 @@ export function MainTop({ active, counts = {}, onRefresh, children }: TopProps) 
         <header className="bar">
           <h1>家のリスト</h1>
           <Link href="/settings" className="icon-link" aria-label="設定">
-            設定
+            <GearIcon />
           </Link>
         </header>
         {/* Links, so the back button and reloads keep the place. */}
@@ -123,4 +125,40 @@ function usePullToRefresh(onRefresh: () => Promise<unknown>) {
   }, [refresh]);
 
   return { pull, refreshing, refresh };
+}
+
+// Each page the app opens remembers how many of the app's own pages are behind it, so going
+// back knows whether it stays in the app. Given to the Router, so every Link and navigate
+// records it; replacing a page (filters, redirects) keeps the count.
+type Entry = { depth?: number } | null;
+const depth = () => (history.state as Entry)?.depth ?? 0;
+
+export function useAppLocation(router: { ssrPath?: string }): [string, (to: string, options?: { replace?: boolean }) => void] {
+  return [usePathname(router), (to, { replace = false } = {}) => browserNavigate(to, { replace, state: { depth: replace ? depth() : depth() + 1 } })];
+}
+
+// Back to the page the person came from (a filtered recipe list comes back filtered). A page
+// opened directly, with nothing of the app behind it, goes to `fallback` instead.
+export function useBack(fallback: string) {
+  const [, navigate] = useLocation();
+  return () => (depth() > 0 ? history.back() : navigate(fallback, { replace: true }));
+}
+
+// "‹ 戻る" above a page's title, the way iPhone apps go back. `onBack` replaces going back,
+// for a state of the same page (editing a recipe returns to the recipe).
+export function BackLink({ fallback, onBack }: { fallback: string; onBack?: () => void }) {
+  const back = useBack(fallback);
+  return (
+    <Link
+      href={fallback}
+      className="back"
+      onClick={(event) => {
+        event.preventDefault();
+        (onBack ?? back)();
+      }}
+    >
+      <BackIcon />
+      戻る
+    </Link>
+  );
 }
