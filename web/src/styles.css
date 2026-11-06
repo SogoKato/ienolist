@@ -797,6 +797,16 @@ button.icon:active {
   align-self: center;
   color: var(--accent-soft-text);
 }
+/* The news that the assistant has connected, in place of the guide. */
+.invite.joined {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-soft-text);
+}
+.joined-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
 /* Both ways to connect side by side, as wide as the page: the page leads up to them. */
 .connect-choices {
   display: grid;

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { accessLabel, api, type Connection } from "../api";
 import { useSession } from "../session";
 import { Page } from "../ui";
 
@@ -110,18 +111,29 @@ function Shots() {
 // only in a browser, by hand.
 function Connect({ name }: { name: string }) {
   const [guide, setGuide] = useState<"claude" | "chatgpt" | null>(null);
+  // The guide gives way to the news once the assistant has connected.
+  const done = useNewConnection(guide);
+  const open = (which: "claude" | "chatgpt") => setGuide(guide === which ? null : which);
   return (
     <section aria-labelledby="connect">
       <h2 id="connect">つなぐ</h2>
       <div className="connect-choices">
-        <button className={guide === "claude" ? "primary" : undefined} aria-expanded={guide === "claude"} onClick={() => setGuide(guide === "claude" ? null : "claude")}>
+        <button className={guide === "claude" ? "primary" : undefined} aria-expanded={guide === "claude"} onClick={() => open("claude")}>
           Claude とつなぐ
         </button>
-        <button className={guide === "chatgpt" ? "primary" : undefined} aria-expanded={guide === "chatgpt"} onClick={() => setGuide(guide === "chatgpt" ? null : "chatgpt")}>
+        <button className={guide === "chatgpt" ? "primary" : undefined} aria-expanded={guide === "chatgpt"} onClick={() => open("chatgpt")}>
           ChatGPT とつなぐ
         </button>
       </div>
-      {guide === "claude" && (
+      {done && (
+        <div className="invite joined" role="status">
+          <p className="joined-title">接続できました！</p>
+          <p>
+            <strong>{done.clientName}</strong> が、{name}のリストを{accessLabel(done.scopes)}で使えるようになりました。上の例のように話しかけてみてください。
+          </p>
+        </div>
+      )}
+      {!done && guide === "claude" && (
         <div className="invite">
           <p>開いた画面で「追加」を押し、続く「接続を許可しますか？」の画面で許可してください。</p>
           <a className="button primary" href={claudeLink(name)} target="_blank" rel="noopener noreferrer">
@@ -131,7 +143,7 @@ function Connect({ name }: { name: string }) {
           <McpUrl />
         </div>
       )}
-      {guide === "chatgpt" && (
+      {!done && guide === "chatgpt" && (
         <div className="invite">
           <p>ChatGPT のアプリでは追加できません。Safari などのブラウザで ChatGPT にログインして進めてください。</p>
           <ol className="steps">
@@ -149,6 +161,55 @@ function Connect({ name }: { name: string }) {
       )}
     </section>
   );
+}
+
+// While a guide is open, the connection it leads to, once there is one: the connections are looked
+// at again every few seconds, and as soon as the page is back in view (from the assistant's tab or
+// app), until one that was not there at first shows up. Watching stops after a while.
+const WATCH_EVERY = 3000;
+const WATCH_FOR = 15 * 60 * 1000;
+
+function useNewConnection(guide: string | null): Connection | null {
+  const [added, setAdded] = useState<Connection | null>(null);
+  useEffect(() => {
+    setAdded(null);
+    if (!guide) return;
+    let known: Set<string> | null = null;
+    let over = false;
+    const check = async () => {
+      if (over || document.hidden) return;
+      try {
+        const { connections } = await api.get<{ connections: Connection[] }>("/api/connections");
+        if (over) return;
+        if (!known) {
+          known = new Set(connections.map((c) => c.id));
+          return;
+        }
+        const found = connections.find((c) => !known!.has(c.id));
+        if (found) {
+          setAdded(found);
+          stop();
+        }
+      } catch {
+        // Tried again on the next round.
+      }
+    };
+    const timer = setInterval(check, WATCH_EVERY);
+    const limit = setTimeout(() => stop(), WATCH_FOR);
+    const onVisible = () => void check();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    function stop() {
+      over = true;
+      clearInterval(timer);
+      clearTimeout(limit);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    }
+    void check();
+    return stop;
+  }, [guide]);
+  return added;
 }
 
 function McpUrl() {

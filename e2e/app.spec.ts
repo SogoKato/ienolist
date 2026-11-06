@@ -355,6 +355,27 @@ test.describe("connecting an assistant", () => {
     expect(call.status()).toBe(401);
   });
 
+  test("with a guide open, the page says so when the assistant has connected meanwhile, in another tab", async () => {
+    await aki.goto("/assistants");
+    await aki.getByRole("button", { name: "ChatGPT とつなぐ" }).click();
+    await expect(aki.getByText("ChatGPT のアプリでは追加できません。", { exact: false })).toBeVisible();
+
+    const tab = await aki.context().newPage();
+    await tab.route("https://claude.ai/**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "callback" }));
+    const { verifier, url } = await authorizeUrl(tab, "state-3");
+    await tab.goto(url);
+    await tab.getByRole("button", { name: "許可する" }).click();
+    await tab.waitForURL((url) => url.origin === "https://claude.ai");
+    const code = new URL(tab.url()).searchParams.get("code")!;
+    const token = await tab.request.post("/oauth/token", { form: { grant_type: "authorization_code", code, code_verifier: verifier, client_id: clientId, redirect_uri: redirect } });
+    expect(token.status()).toBe(200);
+    await tab.close();
+
+    await expect(aki.getByText("接続できました！")).toBeVisible({ timeout: 10_000 });
+    await expect(aki.getByText("のリストを閲覧と編集で使えるようになりました。", { exact: false })).toBeVisible();
+    await expect(aki.getByText("ChatGPT のアプリでは追加できません。", { exact: false })).toBeHidden();
+  });
+
   test("saying no sends the assistant back with access_denied", async () => {
     const { url } = await authorizeUrl(aki, "state-2");
     await aki.goto(url);

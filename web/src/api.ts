@@ -54,6 +54,8 @@ export type Cook = { id: string; recipeId: string | null; title: string; cookedO
 export type Member = { id: string; displayName: string; role: Role };
 export type Passkey = { id: string; deviceName: string | null; createdAt: number; lastUsedAt: number | null };
 export type Connection = { id: string; clientName: string; scopes: string[]; createdAt: number };
+// What a connection may do, over everything the app has now or adds later.
+export const accessLabel = (scopes: string[]) => (scopes.includes("write") ? "閲覧と編集" : "閲覧のみ");
 
 // What a ceremony needs from the server: an id to answer with, and the browser's options.
 export type Ceremony<O> = { challengeId: string; options: O };

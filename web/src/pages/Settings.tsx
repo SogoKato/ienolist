@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { api, type Connection, type Member, type Passkey } from "../api";
+import { accessLabel, api, type Connection, type Member, type Passkey } from "../api";
 import { describeError, guessDeviceName, registerPasskey } from "../passkeys";
 import { useSession } from "../session";
 import { ErrorText, formatDate, Page } from "../ui";
@@ -38,9 +38,6 @@ export function Settings() {
   );
 }
 
-// What a connection may do, over everything the app has now or adds later.
-const access = (scopes: string[]) => (scopes.includes("write") ? "閲覧と編集" : "閲覧のみ");
-
 function Connections({ onError }: { onError(message: string): void }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const load = useCallback(() => api.get<{ connections: Connection[] }>("/api/connections").then((r) => setConnections(r.connections), (e) => onError(describeError(e))), [onError]);
@@ -58,7 +55,7 @@ function Connections({ onError }: { onError(message: string): void }) {
           <li key={c.id}>
             <span>
               <strong>{c.clientName}</strong>
-              <span className="muted"> {formatDate(c.createdAt)} から ・ {access(c.scopes)}</span>
+              <span className="muted"> {formatDate(c.createdAt)} から ・ {accessLabel(c.scopes)}</span>
             </span>
             <button
               onClick={async () => {
