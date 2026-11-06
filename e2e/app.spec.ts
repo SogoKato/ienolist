@@ -323,8 +323,10 @@ test.describe("connecting an assistant", () => {
     accessToken = access;
   });
 
-  test("the settings show how to connect Claude (a filled-in link) and ChatGPT (steps in a browser)", async () => {
+  test("the settings lead to what assistants can do, and how to connect Claude (a filled-in link) and ChatGPT (steps in a browser)", async () => {
     await aki.goto("/settings");
+    await aki.getByRole("link", { name: /Claude や ChatGPT とつなぐ/ }).click();
+    await expect(aki.getByRole("heading", { name: "こんなふうに頼めます" })).toBeVisible();
     await aki.getByRole("button", { name: "Claude とつなぐ" }).click();
     const link = new URL((await aki.getByRole("link", { name: "Claude の追加画面を開く" }).getAttribute("href"))!);
     expect([link.origin + link.pathname, link.searchParams.get("modal"), link.searchParams.get("connectorName"), link.searchParams.get("connectorUrl")]).toEqual([
@@ -336,7 +338,6 @@ test.describe("connecting an assistant", () => {
     await aki.getByRole("button", { name: "ChatGPT とつなぐ" }).click();
     await expect(aki.getByText("ChatGPT のアプリでは追加できません。", { exact: false })).toBeVisible();
     await expect(aki.getByLabel("接続先の URL")).toHaveValue("http://localhost:18787/mcp");
-    await expect(aki.getByRole("button", { name: "「牛乳と卵を買い物リストに入れて」" })).toBeVisible();
   });
 
   test("the connection is listed in the settings, and disconnecting cuts it off", async () => {

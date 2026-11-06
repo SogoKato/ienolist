@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { api, type Connection, type Member, type Passkey } from "../api";
 import { describeError, guessDeviceName, registerPasskey } from "../passkeys";
 import { useSession } from "../session";
@@ -28,8 +28,7 @@ export function Settings() {
         {me.household.name} / {me.user.displayName} さん{me.user.role === "admin" ? "(管理者)" : ""}
       </p>
       <ErrorText>{error}</ErrorText>
-      <Connections name={me.household.name} onError={setError} />
-      <Examples />
+      <Connections onError={setError} />
       <Passkeys onError={setError} />
       <Members admin={me.user.role === "admin"} selfId={me.user.id} onError={setError} />
       <section>
@@ -42,15 +41,8 @@ export function Settings() {
 // What a connection may do, over everything the app has now or adds later.
 const access = (scopes: string[]) => (scopes.includes("write") ? "閲覧と編集" : "閲覧のみ");
 
-// Where an assistant connects: the MCP endpoint at the address the app is open at.
-const mcpUrl = () => `${window.location.origin}/mcp`;
-// claude.ai's link to its "add custom connector" dialog, filled in; the person still confirms there.
-const claudeLink = (name: string) => `https://claude.ai/customize/connectors?${new URLSearchParams({ modal: "add-custom-connector", connectorName: name, connectorUrl: mcpUrl() })}`;
-
-// `name` is the household's, which the assistants show the connection as.
-function Connections({ name, onError }: { name: string; onError(message: string): void }) {
+function Connections({ onError }: { onError(message: string): void }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
-  const [guide, setGuide] = useState<"claude" | "chatgpt" | null>(null);
   const load = useCallback(() => api.get<{ connections: Connection[] }>("/api/connections").then((r) => setConnections(r.connections), (e) => onError(describeError(e))), [onError]);
   useEffect(() => {
     load();
@@ -84,106 +76,11 @@ function Connections({ name, onError }: { name: string; onError(message: string)
           </li>
         ))}
       </ul>
-      {/* Neither assistant can be connected from here in one step: claude.ai opens its dialog filled in,
-          and ChatGPT adds servers only in a browser, by hand. */}
-      <div className="row-actions connect">
-        <button aria-expanded={guide === "claude"} onClick={() => setGuide(guide === "claude" ? null : "claude")}>
-          Claude とつなぐ
-        </button>
-        <button aria-expanded={guide === "chatgpt"} onClick={() => setGuide(guide === "chatgpt" ? null : "chatgpt")}>
-          ChatGPT とつなぐ
-        </button>
-      </div>
-      {guide === "claude" && (
-        <div className="invite">
-          <p>開いた画面で「追加」を押し、続く「接続を許可しますか？」の画面で許可してください。</p>
-          <a className="button primary" href={claudeLink(name)} target="_blank" rel="noopener noreferrer">
-            Claude の追加画面を開く
-          </a>
-          <p className="muted">Claude のアプリからは、設定のコネクタで「カスタムコネクタを追加」を選び、名前に「{name}」、URL に次を入れても追加できます。</p>
-          <McpUrl />
-        </div>
-      )}
-      {guide === "chatgpt" && (
-        <div className="invite">
-          <p>ChatGPT のアプリでは追加できません。Safari などのブラウザで ChatGPT にログインして進めてください。</p>
-          <ol className="steps">
-            <li>下のボタンで ChatGPT のプラグインの画面を開く（アプリが開いたら、ブラウザで chatgpt.com を開き直す）</li>
-            <li>右上の「追加」から「カスタム MCP サーバーを追加」を選ぶ</li>
-            <li>名前に「{name}」、サーバー URL に下の URL を入れる（認証は OAuth のまま）</li>
-            <li>「理解したうえで続けます」にチェックして、「プラグインとして作成」を押す</li>
-            <li>「{name}に接続」を押し、続く「接続を許可しますか？」の画面で許可する</li>
-          </ol>
-          <McpUrl />
-          <a className="button" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">
-            ChatGPT を開く
-          </a>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function McpUrl() {
-  const [copied, setCopied] = useState(false);
-  return (
-    <>
-      <input readOnly value={mcpUrl()} aria-label="接続先の URL" onFocus={(e) => e.currentTarget.select()} />
-      <button onClick={() => navigator.clipboard?.writeText(mcpUrl()).then(() => setCopied(true), () => {})}>{copied ? "コピーしました" : "URL をコピー"}</button>
-    </>
-  );
-}
-
-// What a connected assistant can be asked, in everyday words: what it can do is not obvious from
-// having connected it. `with` is what goes along with the words (a photo, a link).
-const EXAMPLES: { heading: string; asks: { text: string; with?: string }[] }[] = [
-  {
-    heading: "買い物と冷蔵庫",
-    asks: [
-      { text: "牛乳と卵を買い物リストに入れて" },
-      { text: "買ったものを冷蔵庫に移して" },
-      { text: "買ったものを冷蔵庫に入れて", with: "レシートの写真を添えて" },
-      { text: "冷蔵庫に何がある？使い切ったものは買い物リストに戻して" },
-    ],
-  },
-  {
-    heading: "レシピ",
-    asks: [
-      { text: "このレシピを登録して", with: "レシピのページの URL を添えて" },
-      { text: "この本のレシピとして登録して。42 ページ", with: "本のページの写真を添えて" },
-      { text: "肉じゃがの材料のうち、冷蔵庫にないものを買い物リストに入れて" },
-      { text: "しばらく作っていないレシピから、今週の夕飯を 3 つ選んで" },
-      { text: "今日は肉じゃがを作った、と記録して" },
-    ],
-  },
-  {
-    heading: "振り返り",
-    asks: [{ text: "最近よく買っているものは？" }, { text: "先月作った料理を教えて" }],
-  },
-];
-
-function Examples() {
-  const [copied, setCopied] = useState<string | null>(null);
-  return (
-    <section aria-labelledby="examples">
-      <h2 id="examples">アシスタントへの頼み方</h2>
-      <p className="muted">つないだアシスタントには、ふだんの言葉で頼めます。例を押すとコピーできます。</p>
-      {EXAMPLES.map(({ heading, asks }) => (
-        <div key={heading} className="examples">
-          <h3>{heading}</h3>
-          <ul className="plain">
-            {asks.map(({ text, with: along }) => (
-              <li key={text}>
-                <button className="example" onClick={() => navigator.clipboard?.writeText(text).then(() => setCopied(text), () => {})}>
-                  <span>「{text}」</span>
-                  {along && <span className="note">{along}</span>}
-                  {copied === text && <span className="note" role="status">コピーしました</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {/* What connecting brings and how, on a page of its own. */}
+      <Link href="/assistants" state={{ from: "/settings" }} className="promo">
+        <strong>Claude や ChatGPT とつなぐ</strong>
+        <span>話しかけるだけでリストが動きます。頼み方の例とつなぎ方</span>
+      </Link>
     </section>
   );
 }

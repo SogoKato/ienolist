@@ -615,35 +615,37 @@ button.icon:active {
 .invite p {
   margin: 0;
 }
-.rows + .connect {
+/* The way from the settings to what assistants can do: a card, warm, that reads as an invitation. */
+.promo {
+  display: grid;
+  gap: 4px;
   margin-top: 12px;
+  padding: 14px 40px 14px 16px;
+  position: relative;
+  background: var(--accent-soft);
+  border-radius: var(--radius-surface);
+  color: var(--accent-soft-text);
+  text-decoration: none;
+}
+.promo strong {
+  font-weight: 600;
+}
+.promo span {
+  font-size: 0.875rem;
+}
+.promo::after {
+  content: "›";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.5rem;
 }
 .steps {
   display: grid;
   gap: 6px;
   margin: 0;
   padding-left: 1.4em;
-}
-/* What to ask an assistant: each example a card that copies it, what goes with it under it. */
-.examples h3 {
-  margin: 20px 0 8px;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-.examples ul {
-  display: grid;
-  gap: 8px;
-}
-button.example {
-  display: grid;
-  justify-content: start;
-  justify-items: start;
-  gap: 2px;
-  width: 100%;
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 1rem;
 }
 /* One of a few answers (how much an assistant may do), each with what it means under it. */
 .choices {
@@ -684,6 +686,129 @@ button.example {
 .choice > span {
   display: grid;
   gap: 2px;
+}
+
+/* --- assistants ------------------------------------------------------------------------------ */
+
+/* The page that sells connecting an assistant: a big claim, then cards like an app store's
+   screenshots, swiped sideways so the page stays short. */
+.hero {
+  margin-top: 24px;
+}
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.hero-title {
+  margin: 0;
+  text-wrap: balance;
+  font-size: 1.75rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+.lead {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.shots {
+  display: flex;
+  gap: 12px;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 4px var(--gutter) 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--gutter);
+  scrollbar-width: none;
+}
+.shots::-webkit-scrollbar {
+  display: none;
+}
+.shot {
+  flex: 0 0 82%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 16px 8px;
+  scroll-snap-align: start;
+  background: var(--accent-soft);
+  border-radius: 20px;
+}
+.shot-label {
+  margin: 0;
+  color: var(--accent-soft-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.shot h3 {
+  margin: -6px 0 0;
+  /* Lines break at the comma, not inside a word; a part too long for a line still wraps. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  font-size: 1.25rem;
+  line-height: 1.4;
+  font-weight: 700;
+  font-feature-settings: "palt";
+}
+/* A made-up conversation, drawn the way chat apps do: the person on the right, the reply on the left. */
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+  background: var(--surface);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow);
+}
+.bubble {
+  max-width: 88%;
+  text-wrap: pretty;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.bubble.me {
+  align-self: flex-end;
+  display: grid;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-radius: 16px 16px 4px 16px;
+}
+.bubble.ai {
+  align-self: flex-start;
+  background: var(--fill);
+  color: var(--text);
+  border-radius: 16px 16px 16px 4px;
+}
+.attached {
+  justify-self: end;
+  padding: 2px 8px;
+  border: 1px dashed currentColor;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+.shot button.quiet {
+  align-self: center;
+  color: var(--accent-soft-text);
+}
+/* Both ways to connect side by side, as wide as the page: the page leads up to them. */
+.connect-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.points {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--muted);
 }
 
 /* --- recipes ---------------------------------------------------------------------------------- */

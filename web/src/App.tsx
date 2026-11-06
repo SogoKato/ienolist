@@ -1,6 +1,7 @@
 import { Redirect, Route, Switch, useLocation, useSearch } from "wouter";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
+import { Assistants } from "./pages/Assistants";
 import { Authorize } from "./pages/Authorize";
 import { Join } from "./pages/Join";
 import { Lists } from "./pages/Lists";
@@ -43,6 +44,11 @@ export function App() {
         <Route path="/settings">
           <Private>
             <Settings />
+          </Private>
+        </Route>
+        <Route path="/assistants">
+          <Private>
+            <Assistants />
           </Private>
         </Route>
         <Route path="/recipes">
