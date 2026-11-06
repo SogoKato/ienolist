@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation } from "wouter";
-import { navigate as browserNavigate, usePathname } from "wouter/use-browser-location";
-import { BackIcon, GearIcon } from "./icons";
+import { Link, useLocation, useSearch } from "wouter";
+import { GearIcon } from "./icons";
 
 export type Section = "shopping" | "fridge" | "recipes";
 
@@ -10,6 +9,19 @@ const SECTIONS: { key: Section; label: string; href: string }[] = [
   { key: "fridge", label: "冷蔵庫", href: "/?list=fridge" },
   { key: "recipes", label: "レシピ", href: "/recipes" },
 ];
+
+// Where each tab was left, and its list as last seen, while the app stays open: a tab opens the
+// page left there (the recipe being cooked from, after a look at the fridge), and from a recipe
+// the current tab goes up to the list, still filtered.
+const left: Partial<Record<Section, string>> = {};
+const lists: Partial<Record<Section, string>> = {};
+export const listPath = (section: Section) => lists[section] ?? SECTIONS.find((s) => s.key === section)!.href;
+
+function useHere() {
+  const [path] = useLocation();
+  const search = useSearch();
+  return search ? `${path}?${search}` : path;
+}
 
 type TopProps = {
   active: Section;
@@ -20,47 +32,82 @@ type TopProps = {
   children?: ReactNode;
 };
 
-// The top of the three main pages: the app's name, the way to the settings, the tabs and the
-// page's own box stay in view while the list scrolls under them.
-export function MainTop({ active, counts = {}, onRefresh, children }: TopProps) {
+// The top of the three main pages, which also refresh: pulled down from the top, or with a tap on
+// the current tab.
+export function MainTop({ active, counts, onRefresh, children }: TopProps) {
   const { pull, refreshing, refresh } = usePullToRefresh(onRefresh);
+  const here = useHere();
+  useEffect(() => {
+    lists[active] = here;
+  }, [active, here]);
   return (
     <>
-      <div className="top">
-        <header className="bar">
-          <h1>家のリスト</h1>
-          <Link href="/settings" className="icon-link" aria-label="設定">
-            <GearIcon />
-          </Link>
-        </header>
-        {/* Links, so the back button and reloads keep the place. */}
-        <nav className="tabs" role="tablist">
-          {SECTIONS.map(({ key, label, href }) => (
-            <Link
-              key={key}
-              href={href}
-              role="tab"
-              aria-selected={active === key}
-              className={active === key ? "tab active" : "tab"}
-              onClick={(event) => {
-                if (active !== key) return;
-                // The current tab again: back to the top, with what is on the server now.
-                event.preventDefault();
-                window.scrollTo({ top: 0, behavior: "smooth" });
-                refresh();
-              }}
-            >
-              {label}
-              {counts[key] !== undefined && <span className="count">{counts[key]}</span>}
-            </Link>
-          ))}
-        </nav>
+      <Top
+        at={active}
+        counts={counts}
+        onCurrent={() => {
+          // The current tab again: back to the top, with what is on the server now.
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          refresh();
+        }}
+      >
         {children}
-      </div>
+      </Top>
       <div className="pull" style={{ height: refreshing ? PULL_AT : pull, transition: pull && !refreshing ? "none" : undefined }} aria-live="polite">
         {refreshing ? "更新中…" : pull >= PULL_AT ? "離すと更新" : pull > 0 ? "引っ張って更新" : ""}
       </div>
     </>
+  );
+}
+
+// The top every signed-in page starts with: the app's name, the way to the settings and the tabs
+// stay in view while the page scrolls under them. `at` is the tab the page belongs to, lit, or the
+// settings, where the gear is lit instead.
+export function Top({ at, counts = {}, onCurrent, children }: { at: Section | "settings"; counts?: Partial<Record<Section, number>>; onCurrent?(): void; children?: ReactNode }) {
+  const [, navigate] = useLocation();
+  const here = useHere();
+  useEffect(() => {
+    if (at !== "settings") left[at] = here;
+  }, [at, here]);
+  return (
+    <div className="top">
+      <header className="bar">
+        <h1>家のリスト</h1>
+        <Link
+          href="/settings"
+          className="icon-link"
+          aria-label="設定"
+          aria-current={at === "settings" ? "page" : undefined}
+          onClick={(event) => {
+            if (at === "settings") event.preventDefault();
+          }}
+        >
+          <GearIcon />
+        </Link>
+      </header>
+      {/* Links, so the back button and reloads keep the place. */}
+      <nav className="tabs" role="tablist">
+        {SECTIONS.map(({ key, label, href }) => (
+          <Link
+            key={key}
+            href={href}
+            role="tab"
+            aria-selected={at === key}
+            className={at === key ? "tab active" : "tab"}
+            onClick={(event) => {
+              event.preventDefault();
+              if (at !== key) navigate(left[key] ?? href);
+              else if (onCurrent) onCurrent();
+              else navigate(listPath(key));
+            }}
+          >
+            {label}
+            {counts[key] !== undefined && <span className="count">{counts[key]}</span>}
+          </Link>
+        ))}
+      </nav>
+      {children}
+    </div>
   );
 }
 
@@ -125,40 +172,4 @@ function usePullToRefresh(onRefresh: () => Promise<unknown>) {
   }, [refresh]);
 
   return { pull, refreshing, refresh };
-}
-
-// Each page the app opens remembers how many of the app's own pages are behind it, so going
-// back knows whether it stays in the app. Given to the Router, so every Link and navigate
-// records it; replacing a page (filters, redirects) keeps the count.
-type Entry = { depth?: number } | null;
-const depth = () => (history.state as Entry)?.depth ?? 0;
-
-export function useAppLocation(router: { ssrPath?: string }): [string, (to: string, options?: { replace?: boolean }) => void] {
-  return [usePathname(router), (to, { replace = false } = {}) => browserNavigate(to, { replace, state: { depth: replace ? depth() : depth() + 1 } })];
-}
-
-// Back to the page the person came from (a filtered recipe list comes back filtered). A page
-// opened directly, with nothing of the app behind it, goes to `fallback` instead.
-export function useBack(fallback: string) {
-  const [, navigate] = useLocation();
-  return () => (depth() > 0 ? history.back() : navigate(fallback, { replace: true }));
-}
-
-// "‹ 戻る" above a page's title, the way iPhone apps go back. `onBack` replaces going back,
-// for a state of the same page (editing a recipe returns to the recipe).
-export function BackLink({ fallback, onBack }: { fallback: string; onBack?: () => void }) {
-  const back = useBack(fallback);
-  return (
-    <Link
-      href={fallback}
-      className="back"
-      onClick={(event) => {
-        event.preventDefault();
-        (onBack ?? back)();
-      }}
-    >
-      <BackIcon />
-      戻る
-    </Link>
-  );
 }

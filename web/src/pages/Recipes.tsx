@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { api, type Book, type Cook, type Recipe, type Tag } from "../api";
 import { localDate, shortDate } from "../dates";
-import { BackLink, MainTop, useBack } from "../nav";
+import { listPath, MainTop } from "../nav";
 import { parseTags } from "../tags";
 import { describeError } from "../passkeys";
 import { ErrorText, Page } from "../ui";
@@ -299,15 +299,14 @@ const EMPTY: Fields = { title: "", url: "", body: "", book: "", page: "", tags: 
 
 export function NewRecipe() {
   const [, navigate] = useLocation();
-  const back = useBack("/recipes");
   const [error, setError] = useState("");
   return (
-    <Page title="レシピを追加" back={<BackLink fallback="/recipes" />}>
+    <Page title="レシピを追加" at="recipes">
       <ErrorText>{error}</ErrorText>
       <RecipeForm
         initial={EMPTY}
         submitLabel="追加"
-        onCancel={back}
+        onCancel={() => navigate(listPath("recipes"))}
         onSubmit={async (fields) => {
           setError("");
           try {
@@ -357,16 +356,16 @@ export function RecipeDetail({ id }: { id: string }) {
 
   if (missing) {
     return (
-      <Page title="レシピが見つかりません" back={<BackLink fallback="/recipes" />}>
+      <Page title="レシピが見つかりません" at="recipes">
         <p className="muted">削除されたか、別の家のレシピです。</p>
       </Page>
     );
   }
-  if (!recipe) return error ? <ErrorText>{error}</ErrorText> : <p className="muted center">読み込み中…</p>;
+  if (!recipe) return <Page at="recipes">{error ? <ErrorText>{error}</ErrorText> : <p className="muted center">読み込み中…</p>}</Page>;
 
   if (editing) {
     return (
-      <Page title="レシピを編集" back={<BackLink fallback="/recipes" onBack={() => setEditing(false)} />}>
+      <Page title="レシピを編集" at="recipes">
         <ErrorText>{error}</ErrorText>
         <RecipeForm
           initial={{ title: recipe.title, url: recipe.url ?? "", body: recipe.body ?? "", book: recipe.book?.title ?? "", page: recipe.page ?? "", tags: recipe.tags.join(" ") }}
@@ -385,7 +384,7 @@ export function RecipeDetail({ id }: { id: string }) {
   }
 
   return (
-    <Page title={recipe.title} back={<BackLink fallback="/recipes" />}>
+    <Page title={recipe.title} at="recipes">
       {recipe.tags.length > 0 && (
         <p className="tags">
           {recipe.tags.map((t) => (

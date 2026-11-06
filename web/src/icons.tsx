@@ -24,9 +24,3 @@ export const GearIcon = () => (
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
-
-export const BackIcon = () => (
-  <svg {...icon}>
-    <path d="M14.5 5.5L8 12l6.5 6.5" />
-  </svg>
-);
