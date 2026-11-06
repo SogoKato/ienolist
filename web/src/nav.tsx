@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { GearIcon } from "./icons";
+import { useSession } from "./session";
 
 export type Section = "shopping" | "fridge" | "recipes";
 
@@ -60,11 +61,12 @@ export function MainTop({ active, counts, onRefresh, children }: TopProps) {
   );
 }
 
-// The top every signed-in page starts with: the app's name, the way to the settings and the tabs
+// The top every signed-in page starts with: the household's name, the way to the settings and the tabs
 // stay in view while the page scrolls under them. `at` is the tab the page belongs to, lit, or the
 // settings, where the gear is lit instead.
 export function Top({ at, counts = {}, onCurrent, children }: { at: Section | "settings"; counts?: Partial<Record<Section, number>>; onCurrent?(): void; children?: ReactNode }) {
   const [, navigate] = useLocation();
+  const { state } = useSession();
   const here = useHere();
   useEffect(() => {
     if (at !== "settings") left[at] = here;
@@ -74,7 +76,8 @@ export function Top({ at, counts = {}, onCurrent, children }: { at: Section | "s
   return (
     <div className="top">
       <header className="bar">
-        <h1>家のリスト</h1>
+        {/* The household's own name rather than the app's: it is their lists. */}
+        <h1>{state.status === "in" ? state.me.household.name : "家のリスト"}</h1>
         {at === "settings" ? (
           // There the gear closes them: back to that page, or to the shopping list when they were
           // opened some other way (by their address, after signing in).

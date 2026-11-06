@@ -28,7 +28,7 @@ export function Settings() {
         {me.household.name} / {me.user.displayName} さん{me.user.role === "admin" ? "(管理者)" : ""}
       </p>
       <ErrorText>{error}</ErrorText>
-      <Connections onError={setError} />
+      <Connections name={me.household.name} onError={setError} />
       <Passkeys onError={setError} />
       <Members admin={me.user.role === "admin"} selfId={me.user.id} onError={setError} />
       <section>
@@ -44,9 +44,10 @@ const access = (scopes: string[]) => (scopes.includes("write") ? "閲覧と編�
 // Where an assistant connects: the MCP endpoint at the address the app is open at.
 const mcpUrl = () => `${window.location.origin}/mcp`;
 // claude.ai's link to its "add custom connector" dialog, filled in; the person still confirms there.
-const claudeLink = () => `https://claude.ai/customize/connectors?${new URLSearchParams({ modal: "add-custom-connector", connectorName: "家のリスト", connectorUrl: mcpUrl() })}`;
+const claudeLink = (name: string) => `https://claude.ai/customize/connectors?${new URLSearchParams({ modal: "add-custom-connector", connectorName: name, connectorUrl: mcpUrl() })}`;
 
-function Connections({ onError }: { onError(message: string): void }) {
+// `name` is the household's, which the assistants show the connection as.
+function Connections({ name, onError }: { name: string; onError(message: string): void }) {
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [guide, setGuide] = useState<"claude" | "chatgpt" | null>(null);
   const load = useCallback(() => api.get<{ connections: Connection[] }>("/api/connections").then((r) => setConnections(r.connections), (e) => onError(describeError(e))), [onError]);
@@ -94,11 +95,11 @@ function Connections({ onError }: { onError(message: string): void }) {
       </div>
       {guide === "claude" && (
         <div className="invite">
-          <p>開いた画面で「追加」を押し、続く家のリストの画面で接続を許可してください。</p>
-          <a className="button primary" href={claudeLink()} target="_blank" rel="noopener noreferrer">
+          <p>開いた画面で「追加」を押し、続く「接続を許可しますか？」の画面で許可してください。</p>
+          <a className="button primary" href={claudeLink(name)} target="_blank" rel="noopener noreferrer">
             Claude の追加画面を開く
           </a>
-          <p className="muted">Claude のアプリからは、設定のコネクタで「カスタムコネクタを追加」を選び、名前に「家のリスト」、URL に次を入れても追加できます。</p>
+          <p className="muted">Claude のアプリからは、設定のコネクタで「カスタムコネクタを追加」を選び、名前に「{name}」、URL に次を入れても追加できます。</p>
           <McpUrl />
         </div>
       )}
@@ -108,9 +109,9 @@ function Connections({ onError }: { onError(message: string): void }) {
           <ol className="steps">
             <li>下のボタンで ChatGPT のプラグインの画面を開く（アプリが開いたら、ブラウザで chatgpt.com を開き直す）</li>
             <li>右上の「追加」から「カスタム MCP サーバーを追加」を選ぶ</li>
-            <li>名前に「家のリスト」、サーバー URL に下の URL を入れる（認証は OAuth のまま）</li>
+            <li>名前に「{name}」、サーバー URL に下の URL を入れる（認証は OAuth のまま）</li>
             <li>「理解したうえで続けます」にチェックして、「プラグインとして作成」を押す</li>
-            <li>「家のリストに接続」を押し、続く家のリストの画面で接続を許可する</li>
+            <li>「{name}に接続」を押し、続く「接続を許可しますか？」の画面で許可する</li>
           </ol>
           <McpUrl />
           <a className="button" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">

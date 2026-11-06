@@ -45,7 +45,7 @@ test("the first visitor is sent to set the app up, and ends up signed in with a 
   await aki.getByLabel("あなたの名前").fill("Aki");
   await aki.getByLabel("家の名前").fill("我が家");
   await aki.getByRole("button", { name: "パスキーを作って始める" }).click();
-  await expect(aki.getByRole("heading", { name: "家のリスト" })).toBeVisible();
+  await expect(aki.getByRole("heading", { name: "我が家", exact: true })).toBeVisible();
   await expect(aki).toHaveURL(/\/$/);
 });
 
@@ -117,7 +117,7 @@ test("an invited family member joins on their own device and sees the same lists
   await expect(ben.getByRole("heading", { name: "我が家 に参加" })).toBeVisible();
   await ben.getByLabel("あなたの名前").fill("Ben");
   await ben.getByRole("button", { name: "パスキーを作る" }).click();
-  await expect(ben.getByRole("heading", { name: "家のリスト" })).toBeVisible();
+  await expect(ben.getByRole("heading", { name: "我が家", exact: true })).toBeVisible();
   await ben.getByRole("tab", { name: /冷蔵庫/ }).click();
   await expect(ben.getByText("牛乳")).toBeVisible();
 
@@ -330,7 +330,7 @@ test.describe("connecting an assistant", () => {
     expect([link.origin + link.pathname, link.searchParams.get("modal"), link.searchParams.get("connectorName"), link.searchParams.get("connectorUrl")]).toEqual([
       "https://claude.ai/customize/connectors",
       "add-custom-connector",
-      "家のリスト",
+      "我が家",
       "http://localhost:18787/mcp",
     ]);
     await aki.getByRole("button", { name: "ChatGPT とつなぐ" }).click();
