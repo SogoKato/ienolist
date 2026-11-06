@@ -17,6 +17,17 @@ export const SCOPE_WRITE = "write";
 export const missingScope = () =>
   "This connection may only read. To let it make changes, disconnect it in the settings of 家のリスト and connect again, choosing 閲覧と編集 (read and change).";
 
+// What the model is told about the server as a whole, before any tool. The rules each tool needs stay in
+// its own description, since not every client passes these on.
+export const INSTRUCTIONS = [
+  "These are one household's shared lists: a shopping list, what is in the fridge (and the rest of the kitchen), and their recipe collection with when each dish was cooked.",
+  "The family uses them in an app too and sees every change at once, so change only what the person asked for, and say what you changed.",
+  "Asked what you can do here, or on a first use: look at their fridge and recipes first, then suggest three or so short things to ask that fit what they have, in their words; keep ids and field names out of it.",
+  "A photo of a receipt or of shopping: put what was bought in the fridge, and tick off (bought) or move the same things on the shopping list rather than adding them twice.",
+  "Before deleting several items or recipes at once, say which and ask.",
+  "Answer in the person's language, and keep item names as they write them.",
+].join(" ");
+
 const result = (value: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
 
 const list = z.enum(LISTS);

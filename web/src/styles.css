@@ -845,6 +845,31 @@ button.icon:active {
   font-size: 1.125rem;
   font-weight: 700;
 }
+.joined-sub {
+  font-weight: 600;
+}
+.first-asks ol {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.first-asks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+.first-asks li > span {
+  text-wrap: pretty;
+}
+.first-asks button.quiet {
+  flex: none;
+  color: var(--accent-ink);
+}
 /* Both ways to connect, one above the other and as wide as the page: the page leads up to them. */
 .connect-choices {
   display: grid;

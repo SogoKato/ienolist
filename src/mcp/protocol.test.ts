@@ -35,12 +35,15 @@ const boom = defineTool<{ calls: string[] }, any>({
   },
 });
 const tools = [echo, boom];
+const seen: object[] = [];
 const handle = createMcpHandler({
   serverInfo: { name: "t", version: "1" },
   tools,
   toolsJson: serializeTools(tools as never),
   userFacingError: (e) => (e instanceof Visible ? e.message : null),
   missingScope: (scope) => `Missing scope: ${scope}`,
+  instructions: "How to use this server.",
+  onRequest: (info) => seen.push(info),
 });
 
 const V = "2026-07-28";
@@ -65,6 +68,27 @@ test("ids of any JSON type are echoed back, including in the pre-serialized tool
     const ping = (await (await modern(id, "ping")).response.json());
     assert.deepEqual(ping.id, id);
   }
+});
+
+test("the instructions come with the server's identity, in both eras", async () => {
+  const discover = (await (await modern(1, "server/discover")).response.json()).result;
+  assert.equal(discover.instructions, "How to use this server.");
+  const init = (await (await send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } })).response.json()).result;
+  assert.equal(init.instructions, "How to use this server.");
+});
+
+test("each request is reported by what it asks for, without its arguments", async () => {
+  seen.length = 0;
+  const clientInfo = { name: "claude-ai", version: "1" };
+  await send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo } });
+  await send(
+    { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "echo", arguments: { text: "private" }, _meta: { ...meta._meta, "io.modelcontextprotocol/clientInfo": clientInfo } } },
+    { "mcp-protocol-version": V, "mcp-method": "tools/call", "mcp-name": "echo" },
+  );
+  assert.deepEqual(seen, [
+    { method: "initialize", tool: undefined, client: "claude-ai", protocolVersion: "2025-06-18" },
+    { method: "tools/call", tool: "echo", client: "claude-ai", protocolVersion: V },
+  ]);
 });
 
 test("ping works in both eras", async () => {

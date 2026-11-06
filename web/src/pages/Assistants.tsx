@@ -134,8 +134,9 @@ function Connect({ name }: { name: string }) {
         <div className="invite joined" role="status">
           <p className="joined-title">接続できました！</p>
           <p>
-            <strong>{done.clientName}</strong> が、{name}のリストを{accessLabel(done.scopes)}で使えるようになりました。上の例のように話しかけてみてください。
+            <strong>{done.clientName}</strong> が、{name}のリストを{accessLabel(done.scopes)}で使えるようになりました。
           </p>
+          <FirstAsks name={name} />
         </div>
       )}
       {!done && guide === "claude" && (
@@ -172,6 +173,30 @@ function Connect({ name }: { name: string }) {
         </div>
       )}
     </section>
+  );
+}
+
+// The first things to ask, right after connecting: one that shows it works (the fridge is never
+// empty, and reading is allowed even read-only), and one whose answer, steered by the server's
+// instructions, suggests what to ask next from the household's own lists. Both name the connection,
+// which helps the assistant reach for it.
+function FirstAsks({ name }: { name: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const asks = [`${name}の冷蔵庫に何がある？`, `${name}のリストで何ができる？`];
+  return (
+    <div className="first-asks">
+      <p className="joined-sub">まずはこう聞いてみましょう</p>
+      <ol className="plain">
+        {asks.map((ask) => (
+          <li key={ask}>
+            <span>「{ask}」</span>
+            <button className="quiet" onClick={() => navigator.clipboard?.writeText(ask).then(() => setCopied(ask), () => {})}>
+              {copied === ask ? "コピーしました" : "コピー"}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

@@ -374,6 +374,7 @@ test.describe("connecting an assistant", () => {
 
     await expect(aki.getByText("接続できました！")).toBeVisible({ timeout: 10_000 });
     await expect(aki.getByText("のリストを閲覧と編集で使えるようになりました。", { exact: false })).toBeVisible();
+    await expect(aki.getByText("「我が家の冷蔵庫に何がある？」")).toBeVisible();
     await expect(aki.getByText("ChatGPT のアプリでは追加できません。", { exact: false })).toBeHidden();
   });
 

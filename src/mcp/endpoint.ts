@@ -2,7 +2,7 @@ import type { Actor, ItemService } from "../items/service.ts";
 import type { RecipeService } from "../recipes/service.ts";
 import { createMcpHandler } from "./protocol.ts";
 import { TOOLS_JSON } from "./tools.generated.ts";
-import { missingScope, tools, userFacingError } from "./tools.ts";
+import { INSTRUCTIONS, missingScope, tools, userFacingError } from "./tools.ts";
 
 export type McpPrincipal = { actor: Actor; scopes: string[] };
 
@@ -15,7 +15,16 @@ export type McpDeps = {
   recipes: RecipeService;
 };
 
-const handle = createMcpHandler({ serverInfo: { name: "household-lists", version: "0.0.0" }, tools, toolsJson: TOOLS_JSON, userFacingError, missingScope });
+const handle = createMcpHandler({
+  serverInfo: { name: "household-lists", version: "0.0.0" },
+  tools,
+  toolsJson: TOOLS_JSON,
+  userFacingError,
+  missingScope,
+  instructions: INSTRUCTIONS,
+  // One line per request in the logs: which methods and tools the assistants really use.
+  onRequest: ({ method, ...rest }) => console.log(JSON.stringify({ mcp: method, ...rest })),
+});
 
 export async function handleMcpRequest(request: Request, deps: McpDeps): Promise<Response> {
   const principal = await deps.authenticate(request);

@@ -7,6 +7,7 @@ const MODERN = ["2026-07-28"];
 const LEGACY = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const META_VERSION = "io.modelcontextprotocol/protocolVersion";
 const META_SERVER_INFO = "io.modelcontextprotocol/serverInfo";
+const META_CLIENT_INFO = "io.modelcontextprotocol/clientInfo";
 const CAPABILITIES = { tools: { listChanged: false } };
 
 const E_PARSE = -32700;
@@ -43,9 +44,13 @@ export type McpServerOptions<Ctx> = {
   userFacingError: (error: unknown) => string | null;
   // The answer to a call the token's scopes do not cover.
   missingScope: (scope: string) => string;
+  // Guidance for the model on using the server as a whole, given with the server's identity.
+  instructions: string;
+  // Told what each request asks for (not its arguments), to see what clients actually call.
+  onRequest?: (info: { method: string; tool?: string; client?: string; protocolVersion?: string }) => void;
 };
 
-export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacingError, missingScope }: McpServerOptions<Ctx>) {
+export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacingError, missingScope, instructions, onRequest }: McpServerOptions<Ctx>) {
   const byName = new Map(tools.map((t) => [t.name, t]));
 
   async function callTool(ctx: Ctx, scopes: readonly string[], params: any) {
@@ -82,6 +87,12 @@ export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacing
 
     const requested = params?._meta?.[META_VERSION];
     const modern = typeof requested === "string";
+    onRequest?.({
+      method,
+      tool: method === "tools/call" && typeof params?.name === "string" ? params.name : undefined,
+      client: (modern ? params?._meta?.[META_CLIENT_INFO] : params?.clientInfo)?.name,
+      protocolVersion: modern ? requested : method === "initialize" ? params?.protocolVersion : undefined,
+    });
     const withType = (r: Record<string, unknown>) => (modern ? { resultType: "complete", ...r } : r);
 
     if (modern) {
@@ -111,6 +122,7 @@ export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacing
           protocolVersion: LEGACY.includes(v) ? v : LEGACY[0],
           capabilities: CAPABILITIES,
           serverInfo,
+          instructions,
         });
       }
       case "ping":
@@ -120,6 +132,7 @@ export function createMcpHandler<Ctx>({ serverInfo, tools, toolsJson, userFacing
           supportedVersions: [...MODERN, ...LEGACY],
           capabilities: CAPABILITIES,
           _meta: { [META_SERVER_INFO]: serverInfo },
+          instructions,
         }));
       case "tools/list": {
         // The set may depend on the caller's authorization, so it is not public-cacheable.
