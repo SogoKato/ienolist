@@ -1,10 +1,10 @@
-/* Colour has few roles: one terracotta for what you act on, a pale peach for labels, and warm
-   neutrals for everything else. The terracotta is a fill (--accent: the current tab, the main
-   button, a ticked box) and words and outlines on the page (--accent-ink: links, the focus ring);
-   in the dark the two part, a calm fill and a lighter ink, so that nothing glows. The red for
-   deleting leans to crimson, away from the terracotta. Radii follow what a thing is: buttons and
-   inputs, surfaces that float (menus, panels), and round pills for what you pick or read as a
-   label (tabs, chips, tags). */
+/* Colour has few roles: one orange for what you act on, a pale yellow for labels, and warm
+   neutrals for everything else. The orange is a fill (--accent: the current tab, the main
+   button, a ticked box), as bright as the app icon's, so white on it stays near 3:1 by choice. Words
+   and outlines on the page take an ink that reads there (--accent-ink: links, the focus ring):
+   deeper than the fill in the light, lighter in the dark. The red for deleting leans to crimson,
+   away from the orange. Radii follow what a thing is: buttons and inputs, surfaces that float
+   (menus, panels), and round pills for what you pick or read as a label (tabs, chips, tags). */
 :root {
   --bg: #f8f5f0;
   --surface: #ffffff;
@@ -14,12 +14,12 @@
   --line: #e8e2d9;
   --line-strong: #dad2c6;
   --line-control: #968b80;
-  --accent: #a14b2c;
-  --accent-pressed: #883f25;
+  --accent: #f0712c;
+  --accent-pressed: #d9601f;
   --accent-text: #ffffff;
-  --accent-ink: #a14b2c;
-  --accent-soft: #f7e7de;
-  --accent-soft-text: #964323;
+  --accent-ink: #bd4d0a;
+  --accent-soft: #fdf1c7;
+  --accent-soft-text: #7a5600;
   --danger: #a8213f;
   --shadow: 0 8px 24px rgb(43 37 33 / 0.12);
 
@@ -39,12 +39,12 @@
     --line: #36312e;
     --line-strong: #49423d;
     --line-control: #877d73;
-    --accent: #9c573f;
-    --accent-pressed: #8a4d38;
-    --accent-text: #fff6f0;
-    --accent-ink: #e2a083;
-    --accent-soft: #3a2c25;
-    --accent-soft-text: #e5b49d;
+    --accent: #e8692a;
+    --accent-pressed: #cf5b22;
+    --accent-text: #ffffff;
+    --accent-ink: #f5a26b;
+    --accent-soft: #3a3018;
+    --accent-soft-text: #f0d27a;
     --danger: #eea2b0;
     --shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   }
