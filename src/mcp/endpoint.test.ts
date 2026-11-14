@@ -87,7 +87,7 @@ test("modern: server/discover and tools/list", async () => {
 test("legacy: initialize, notifications and tools/list without resultType", async () => {
   const init = (await (await post(rpc(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "0" } }))).json()).result;
   assert.equal(init.protocolVersion, "2025-06-18");
-  assert.equal(init.serverInfo.name, "household-lists");
+  assert.equal(init.serverInfo.name, "okatte");
   const unknown = (await (await post(rpc(1, "initialize", { protocolVersion: "1999-01-01" }))).json()).result;
   assert.equal(unknown.protocolVersion, "2025-11-25");
   assert.equal((await post({ jsonrpc: "2.0", method: "notifications/initialized" })).status, 202);

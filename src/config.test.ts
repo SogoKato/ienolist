@@ -4,7 +4,7 @@ import { ConfigError, loadConfig } from "./config.ts";
 
 test("a public https origin gives the relying party and secure cookies", () => {
   const config = loadConfig({ PUBLIC_URL: "https://lists.example.com" });
-  assert.deepEqual(config.rp, { id: "lists.example.com", name: "Household lists", origin: "https://lists.example.com" });
+  assert.deepEqual(config.rp, { id: "lists.example.com", name: "おかって", origin: "https://lists.example.com" });
   assert.equal(config.origin, "https://lists.example.com");
   assert.equal(config.secureCookies, true);
   assert.equal(config.setupToken, undefined);

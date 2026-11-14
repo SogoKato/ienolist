@@ -54,7 +54,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const setupToken = env.SETUP_TOKEN?.trim();
   return {
     origin: url.origin,
-    rp: { id: url.hostname, name: env.APP_NAME?.trim() || "Household lists", origin: url.origin },
+    rp: { id: url.hostname, name: env.APP_NAME?.trim() || "おかって", origin: url.origin },
     secureCookies: url.protocol === "https:",
     setupToken: setupToken ? setupToken : undefined,
     oauthClients: loadClients(env.OAUTH_CLIENTS),

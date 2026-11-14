@@ -4,7 +4,7 @@ import { toBase64Url } from "../lib/token.ts";
 import { VirtualAuthenticator } from "./virtual-authenticator.ts";
 import { authenticationOptions, registrationOptions, verifyAuthentication, verifyRegistration, type RelyingParty } from "./webauthn.ts";
 
-const rp: RelyingParty = { id: "lists.example.com", name: "Household lists", origin: "https://lists.example.com" };
+const rp: RelyingParty = { id: "lists.example.com", name: "おかって", origin: "https://lists.example.com" };
 
 async function registered() {
   const device = await VirtualAuthenticator.create();

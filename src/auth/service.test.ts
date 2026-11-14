@@ -7,7 +7,7 @@ import { AuthError, createAuthService, type AuthService, type Principal } from "
 import { VirtualAuthenticator } from "./virtual-authenticator.ts";
 import type { RelyingParty } from "./webauthn.ts";
 
-const rp: RelyingParty = { id: "lists.example.com", name: "Household lists", origin: "https://lists.example.com" };
+const rp: RelyingParty = { id: "lists.example.com", name: "おかって", origin: "https://lists.example.com" };
 const DAY = 24 * 60 * 60;
 
 let raw: DatabaseSync;

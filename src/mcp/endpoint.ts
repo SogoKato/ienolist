@@ -16,7 +16,7 @@ export type McpDeps = {
 };
 
 const handle = createMcpHandler({
-  serverInfo: { name: "household-lists", version: "0.0.0" },
+  serverInfo: { name: "okatte", version: "0.0.0" },
   tools,
   toolsJson: TOOLS_JSON,
   userFacingError,

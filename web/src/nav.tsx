@@ -77,7 +77,7 @@ export function Top({ at, counts = {}, onCurrent, children }: { at: Section | "s
     <div className="top">
       <header className="bar">
         {/* The household's own name rather than the app's: it is their lists. */}
-        <h1>{state.status === "in" ? state.me.household.name : "家のリスト"}</h1>
+        <h1>{state.status === "in" ? state.me.household.name : "おかって"}</h1>
         {at === "settings" ? (
           // There the gear closes them: back to that page, or to the shopping list when they were
           // opened some other way (by their address, after signing in).

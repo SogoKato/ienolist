@@ -1,6 +1,6 @@
 {
-  "name": "家のリスト",
-  "short_name": "家のリスト",
+  "name": "おかって",
+  "short_name": "おかって",
   "description": "買い物リストと冷蔵庫リスト",
   "lang": "ja",
   "start_url": "/",

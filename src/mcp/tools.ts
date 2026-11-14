@@ -15,7 +15,7 @@ export const SCOPE_WRITE = "write";
 
 // What a read-only connection hears when asked to change something, to pass on to the person.
 export const missingScope = () =>
-  "This connection may only read. To let it make changes, disconnect it in the settings of 家のリスト and connect again, choosing 閲覧と編集 (read and change).";
+  "This connection may only read. To let it make changes, disconnect it in the app's settings and connect again, choosing 閲覧と編集 (read and change).";
 
 // What the model is told about the server as a whole, before any tool. The rules each tool needs stay in
 // its own description, since not every client passes these on.
