@@ -47,7 +47,8 @@
 
 ### Web API（PWA 向け）
 
-- 設定は環境変数 `PUBLIC_URL`（必須。パスなしのオリジン。https のみ、localhost は http も可）、`SETUP_TOKEN`（任意）、`APP_NAME`（任意）。RP ID とオリジンは `PUBLIC_URL` から導き、`Host` ヘッダーは信用しない。
+- 設定は環境変数 `PUBLIC_URL`（パスなしのオリジン。https のみ、localhost は http も可）、`SETUP_TOKEN`（任意）、`APP_NAME`（任意）。RP ID とオリジンは `PUBLIC_URL` から導き、`Host` ヘッダーは信用しない。
+- `PUBLIC_URL` は Node では必須、Workers では任意。Workers で未設定なら、要求の URL のオリジンを `PUBLIC_URL` として、オリジンごとに `buildApp` を作って使い回す（`src/worker.ts`。コアは `PUBLIC_URL` が与えられる前提のまま変えない）。Cloudflare は Worker に割り当てたホスト名（`workers.dev`、独自ドメイン）への要求しか渡さないので、要求の URL は実在のホスト名を指す。Node ではリバースプロキシの裏で `Host` を送り手が自由に書けるため、この扱いはしない。オリジンごとにパスキー、セッション、OAuth の発行者が分かれ、データは共通。非 localhost の http は https へ 308 で転送する。Deploy ボタンで入力する値を減らすため（Project name から URL が決まるのに、URL をもう一度入力させていた）。
 - セッション Cookie: `HttpOnly`、`SameSite=Lax`（claude.ai から同意画面へのリンクで Cookie が付くように。Strict は使えない）、https では `Secure` と `__Host-` 接頭辞。localhost の http では接頭辞と `Secure` を外す。
 - CSRF: 状態を変える要求（GET/HEAD/OPTIONS 以外）は `Origin` が `PUBLIC_URL` と完全に一致しなければ 403。本文は `application/json` のみ（クロスサイトのフォームでは送れない）。
 - 全レスポンスに `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`frame-ancestors 'none'`、`Referrer-Policy: same-origin`。`/api` は `Cache-Control: no-store`。
@@ -91,12 +92,12 @@
 ### 実行とデプロイ
 
 - エントリポイントは 2 つ。`src/worker.ts`（Cloudflare Workers + D1）と `src/node.ts`（Node + SQLite ファイル。`pnpm start`）。どちらも `src/main.ts` の `buildApp(db, env)` でサービスをつなぐ。
-- 設定: `PUBLIC_URL`（必須）、`SETUP_TOKEN`、`APP_NAME`、`OAUTH_CLIENTS`（事前登録クライアントの JSON 配列 `[{clientId, name, redirectUris}]`）。Node ではさらに `DATABASE_PATH`（既定 `./data/app.db`）と `PORT`（既定 8787）。Workers では vars / secrets。ローカルの Workers は `.dev.vars`。
+- 設定: `PUBLIC_URL`（Node は必須、Workers は任意）、`SETUP_TOKEN`、`APP_NAME`、`OAUTH_CLIENTS`（事前登録クライアントの JSON 配列 `[{clientId, name, redirectUris}]`）。Node ではさらに `DATABASE_PATH`（既定 `./data/app.db`）と `PORT`（既定 8787）。Workers では vars / secrets。ローカルの Workers は `.dev.vars`。
 - スキーマは `drizzle/` の SQL。どちらの版も、まだ当てていないものを自分で当てるので、デプロイや更新に別の手順は要らない。
   - Node は起動時に当てる（`_migrations` で記録）。
   - Workers はファイルを読めないため、`pnpm gen` で SQL を `src/db/migrations.generated.ts` に埋め込む（作り忘れるとテストが失敗する）。アイソレートごとの最初の要求で、1 つずつ D1 の `batch`（全部成功するか全部取り消す）で当てる。記録は `wrangler d1 migrations apply` と同じ `d1_migrations` 表に同じ形で書くので、wrangler のコマンドと食い違わない。何もない時は 1 往復で済む。2 つのアイソレートが同時に当てようとした場合は、後の方の `batch` が取り消され、記録を見直して先に当たっていれば続ける。失敗したら 500 を返し、次の要求でやり直す。
-- ローカルの Workers: `.dev.vars` に `PUBLIC_URL=http://localhost:8787` → `pnpm dev`。
-- Deploy to Cloudflare ボタン（README）: 公開リポジトリを利用者の GitHub に複製し、D1 を作ってデプロイする。`.dev.vars.example` の `PUBLIC_URL` と `SETUP_TOKEN` をシークレットとして入力させ、その説明は `package.json` の `cloudflare.bindings` に書く。ダッシュボードで足した変数（`APP_NAME` など）が次のデプロイで消えないよう、`wrangler.jsonc` に `keep_vars: true` を置く。
+- ローカルの Workers: `pnpm dev`（`PUBLIC_URL` は不要）。
+- Deploy to Cloudflare ボタン（README）: 公開リポジトリを利用者の GitHub に複製し、D1 を作ってデプロイする。`.dev.vars.example` の `SETUP_TOKEN` をシークレットとして入力させ、その説明は `package.json` の `cloudflare.bindings` に書く。ダッシュボードで足した変数（`APP_NAME` など）が次のデプロイで消えないよう、`wrangler.jsonc` に `keep_vars: true` を置く。
 - `pnpm e2e`: 実際の HTTP で、セットアップ（ソフトウェアのパスキー）→ クライアント登録 → 同意 → トークン → MCP 操作 → リフレッシュ → 接続の取り消しまでを通す。引数なしだと Node 版を一時 DB で起動して検査する。`BASE_URL=http://localhost:8787 pnpm e2e` で、起動済みの `wrangler dev` などを検査する（その `PUBLIC_URL` は同じ URL で、世帯が未作成であること）。
 - 確認済み: Node 版、`wrangler dev --local`（workerd + ローカル D1）、実際の Cloudflare（workers.dev、D1）の 3 つで `pnpm e2e` が通る。`nodejs_compat` は不要。Worker の起動時間は 19 ms。
 - 更新: デプロイした時点の版から先へ進めるのは、利用者の GitHub と Cloudflare の側で行う。アプリには自分を書き換える権限（Cloudflare の API トークン）を持たせない。Workers の編集権限はアカウント全体にしか絞れず、アプリが乗っ取られた時の被害がデータからアカウントの Worker 全体に広がるため。また、元のリポジトリのリリースを確認なしに本番へ入れる形も取らない。

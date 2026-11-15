@@ -16,7 +16,7 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "okatte", "migrations_dir": "drizzle" }
   ],
-  // Set PUBLIC_URL (and optionally APP_NAME, SETUP_TOKEN, OAUTH_CLIENTS) as vars or secrets in the dashboard,
+  // Set SETUP_TOKEN (and optionally PUBLIC_URL, APP_NAME, OAUTH_CLIENTS) as vars or secrets in the dashboard,
   // which deploys keep; for local development put them in .dev.vars (see .dev.vars.example).
   "keep_vars": true
 }

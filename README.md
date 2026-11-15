@@ -39,15 +39,13 @@ Cloudflare の無料プラン（Workers と D1）で、1 家族の利用には�
 
 1. 上の **Deploy to Cloudflare** ボタンを押します。
 2. Cloudflare のセットアップ画面で、次を決めます。
-   - **リポジトリ名**: あなたの GitHub に、このリポジトリの複製が作られます。
-   - **Worker の名前**: 例 `okatte`。URL の一部になります。
-   - **D1 データベース**: そのまま新しく作られます。
-   - **`PUBLIC_URL`**: このアプリを開く URL です。Worker の名前が `okatte` なら `https://okatte.<あなたのサブドメイン>.workers.dev` です（サブドメインは Cloudflare のダッシュボードの「Workers & Pages」に表示されています）。分からなければ仮の値を入れて、あとで直せます。
+   - **Git account**: GitHub を選びます。あなたの GitHub に、このリポジトリの複製が作られます。
+   - **Project name**: 例 `okatte`。リポジトリ、Worker、データベースの名前になり、アプリの URL は `https://okatte.あなたのサブドメイン.workers.dev` になります（サブドメインは、ダッシュボードの「Workers & Pages」の右側に表示されています）。
+   - **D1 データベース**: 「Create new」のまま、新しく作ります。
    - **`SETUP_TOKEN`**: 最初の管理者を作るときの合言葉です。長めの文字列にして、控えておいてください。
-3. デプロイが終わったら、表示された URL を開きます。データベースの準備は、最初のアクセスで自動的に行われます。
+   - **Enable Preview builds**: オフにします。オンのままだと、`main` 以外のブランチへの push でプレビュー版がデプロイされ、同じデータベースを使うためです。
+3. 「Deploy」を押し、終わったら表示された URL を開きます。データベースの準備は、最初のアクセスで自動的に行われます。
 4. 「最初の設定」に進みます。
-
-`PUBLIC_URL` をあとから直すときは、ダッシュボードで Worker を開き、「Settings」→「Variables and Secrets」で編集します。
 
 ### 手でデプロイする
 
@@ -61,20 +59,13 @@ npx wrangler login
 pnpm run deploy
 ```
 
-`pnpm run deploy` で、Worker と D1 データベースが作られ、URL が表示されます。続けて、ダッシュボードで Worker を開き、「Settings」→「Variables and Secrets」に次の 2 つを追加します（種類は Secret）。
-
-| 名前 | 値 |
-|---|---|
-| `PUBLIC_URL` | 表示された URL（例 `https://okatte.<あなたのサブドメイン>.workers.dev`） |
-| `SETUP_TOKEN` | 最初の管理者を作るときの合言葉 |
-
-コマンドで設定する場合は `npx wrangler secret put PUBLIC_URL` と `npx wrangler secret put SETUP_TOKEN` です。
+`pnpm run deploy` で、Worker と D1 データベースが作られ、URL が表示されます。最初の管理者を作る前に、ダッシュボードで Worker を開き、「Settings」→「Variables and Secrets」に `SETUP_TOKEN`（種類は Secret、値は合言葉）を追加してください。コマンドなら `npx wrangler secret put SETUP_TOKEN` です。
 
 ### 独自ドメインを使う
 
-ダッシュボードで Worker を開き、「Settings」→「Domains & Routes」→「Add」→「Custom domain」で、Cloudflare で管理しているドメイン（例 `lists.example.com`）を追加し、`PUBLIC_URL` をそのドメインに変えます。
+ダッシュボードで Worker を開き、「Settings」→「Domains & Routes」→「Add」→「Custom domain」で、Cloudflare で管理しているドメイン（例 `lists.example.com`）を追加します。
 
-**パスキーは `PUBLIC_URL` のドメインに結びつきます。** あとからドメインを変えると、登録済みのパスキーが使えなくなるので、家族がパスキーを登録する前に決めてください。
+**パスキーとログインは、開いたドメインごとに分かれます**（データは共通です）。`workers.dev` で登録したパスキーは、独自ドメインでは使えません。使うドメインを 1 つに決めて、家族がパスキーを登録する前に、そのドメインを `PUBLIC_URL`（例 `https://lists.example.com`）として「Variables and Secrets」に設定してください。`PUBLIC_URL` を設定すると、ほかのドメインで開いたときは、ログインやアシスタントの接続ができなくなります。
 
 ### 1 つのアカウントに複数の家を建てる
 
@@ -86,7 +77,7 @@ cp wrangler.jsonc wrangler.parents.jsonc   # wrangler.*.jsonc は Git の管理�
 pnpm build && npx wrangler deploy -c wrangler.parents.jsonc
 ```
 
-`PUBLIC_URL` と `SETUP_TOKEN` は、新しい Worker のほうに設定します。
+`SETUP_TOKEN` は、新しい Worker のほうに設定します。
 
 ## 最初の設定
 
@@ -101,7 +92,7 @@ pnpm build && npx wrangler deploy -c wrangler.parents.jsonc
 
 「設定」→「Claude や ChatGPT とつなぐ」に、頼み方の例と、Claude と ChatGPT それぞれのつなぎ方があります。
 
-つなぐ URL は `PUBLIC_URL` の後ろに `/mcp` を付けたもの（例 `https://okatte.example.workers.dev/mcp`）です。
+つなぐ URL は、アプリの URL の後ろに `/mcp` を付けたもの（例 `https://okatte.example.workers.dev/mcp`）です。
 
 - **Claude**: 設定の「コネクタ」で「カスタムコネクタを追加」を選び、名前（家の名前など）と URL を入れます。
 - **ChatGPT**: ブラウザで ChatGPT を開き、プラグインの画面で「追加」→「カスタム MCP サーバーを追加」を選び、「サーバーURL」に入れます（ChatGPT のスマホアプリからは追加できません）。
@@ -138,7 +129,7 @@ Cloudflare では Worker の Variables and Secrets、Node では環境変数で�
 
 | 名前 | 必須 | 内容 |
 |---|---|---|
-| `PUBLIC_URL` | ○ | アプリを開く URL（パスなし）。https のみ（localhost は http も可） |
+| `PUBLIC_URL` | Node のみ必須 | アプリを開く URL（パスなし）。https のみ（localhost は http も可）。Cloudflare では、設定しなければ開いた URL をそのまま使い、設定するとそのドメインだけで使えます |
 | `SETUP_TOKEN` | 強く推奨 | 最初の管理者を作るときの合言葉。設定しないと、最初にアクセスした人が管理者になります |
 | `APP_NAME` | | パスキーの登録画面に出る名前。既定は「おかって」 |
 | `OAUTH_CLIENTS` | | 自分で登録できないアシスタント用の、事前登録クライアント。JSON の配列 `[{"clientId", "name", "redirectUris": [...]}]` |
@@ -160,7 +151,7 @@ PUBLIC_URL=https://lists.example.com SETUP_TOKEN=... pnpm start
 
 ## 困ったとき
 
-- **画面にエラーが出て使えない**: `PUBLIC_URL` が設定されているか、実際に開いている URL と同じかを確かめてください。Worker のログ（ダッシュボードの「Logs」）に原因が出ます。
+- **画面にエラーが出て使えない / ログインできない**: `PUBLIC_URL` を設定している場合は、実際に開いている URL と同じかを確かめてください。Worker のログ（ダッシュボードの「Logs」）に原因が出ます。
 - **家族が端末をなくした / 機種変更した**: 他の端末でログインできれば、「設定」でパスキーを追加・削除できます。全ての端末を失った場合は、管理者が「設定」→「家族」でその人の「パスキー再登録のリンク」を作ります。古いパスキーとログインはすべて無効になります。
 - **アシスタントが新しい機能を使わない**: Claude や ChatGPT は、つないだ時点の機能の一覧を覚えています。アシスタント側のコネクタの設定で、更新（再読み込み）してください。
 
@@ -168,8 +159,7 @@ PUBLIC_URL=https://lists.example.com SETUP_TOKEN=... pnpm start
 
 ```sh
 pnpm install
-cp .dev.vars.example .dev.vars   # PUBLIC_URL=http://localhost:8787 にする
-pnpm dev                         # Workers と D1 を手元で動かす（http://localhost:8787）
+pnpm dev   # Workers と D1 を手元で動かす（http://localhost:8787）
 ```
 
 画面を作りながら確かめるときは、`PUBLIC_URL=http://localhost:5173 pnpm start`（API）と `pnpm dev:web`（画面、http://localhost:5173）を並べて動かします。

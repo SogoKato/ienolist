@@ -15,7 +15,7 @@ export type Config = {
 
 export class ConfigError extends Error {}
 
-const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+export const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 
 const clientsSchema = z.array(
   z.object({ clientId: z.string().check(z.minLength(1)), name: z.string().check(z.minLength(1)), redirectUris: z.array(z.url()).check(z.minLength(1)) }),
