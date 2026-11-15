@@ -8,7 +8,7 @@
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "gen": "node scripts/gen-tools.ts",
+    "gen": "node scripts/gen-tools.ts && node scripts/gen-migrations.ts",
     "typecheck": "tsc --noEmit && tsc -p web --noEmit && tsc -p e2e --noEmit",
     "test": "node --test \"src/**/*.test.ts\" \"web/src/**/*.test.ts\"",
     "start": "node src/node.ts",

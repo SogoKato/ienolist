@@ -11,8 +11,8 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/oauth/*", "/mcp", "/mcp/*", "/.well-known/*"]
   },
-  // Created on first deploy if no id is given. The schema is the SQL in drizzle/:
-  //   wrangler d1 migrations apply DB --local    (or --remote)
+  // Created on first deploy if no id is given. The Worker applies the SQL in drizzle/ itself on its first
+  // request, recording it where `wrangler d1 migrations apply` does, so that command is optional.
   "d1_databases": [
     { "binding": "DB", "database_name": "okatte", "migrations_dir": "drizzle" }
   ]

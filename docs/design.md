@@ -92,10 +92,15 @@
 
 - エントリポイントは 2 つ。`src/worker.ts`（Cloudflare Workers + D1）と `src/node.ts`（Node + SQLite ファイル。`pnpm start`）。どちらも `src/main.ts` の `buildApp(db, env)` でサービスをつなぐ。
 - 設定: `PUBLIC_URL`（必須）、`SETUP_TOKEN`、`APP_NAME`、`OAUTH_CLIENTS`（事前登録クライアントの JSON 配列 `[{clientId, name, redirectUris}]`）。Node ではさらに `DATABASE_PATH`（既定 `./data/app.db`）と `PORT`（既定 8787）。Workers では vars / secrets。ローカルの Workers は `.dev.vars`。
-- スキーマは `drizzle/` の SQL。Node は起動時に未適用分を適用する（`_migrations` で記録）。D1 は `wrangler d1 migrations apply DB --local|--remote`。
-- ローカルの Workers: `.dev.vars` に `PUBLIC_URL=http://localhost:8787` → `wrangler d1 migrations apply DB --local` → `pnpm dev`。
+- スキーマは `drizzle/` の SQL。どちらの版も、まだ当てていないものを自分で当てるので、デプロイや更新に別の手順は要らない。
+  - Node は起動時に当てる（`_migrations` で記録）。
+  - Workers はファイルを読めないため、`pnpm gen` で SQL を `src/db/migrations.generated.ts` に埋め込む（作り忘れるとテストが失敗する）。アイソレートごとの最初の要求で、1 つずつ D1 の `batch`（全部成功するか全部取り消す）で当てる。記録は `wrangler d1 migrations apply` と同じ `d1_migrations` 表に同じ形で書くので、wrangler のコマンドと食い違わない。何もない時は 1 往復で済む。2 つのアイソレートが同時に当てようとした場合は、後の方の `batch` が取り消され、記録を見直して先に当たっていれば続ける。失敗したら 500 を返し、次の要求でやり直す。
+- ローカルの Workers: `.dev.vars` に `PUBLIC_URL=http://localhost:8787` → `pnpm dev`。
 - `pnpm e2e`: 実際の HTTP で、セットアップ（ソフトウェアのパスキー）→ クライアント登録 → 同意 → トークン → MCP 操作 → リフレッシュ → 接続の取り消しまでを通す。引数なしだと Node 版を一時 DB で起動して検査する。`BASE_URL=http://localhost:8787 pnpm e2e` で、起動済みの `wrangler dev` などを検査する（その `PUBLIC_URL` は同じ URL で、世帯が未作成であること）。
 - 確認済み: Node 版、`wrangler dev --local`（workerd + ローカル D1）、実際の Cloudflare（workers.dev、D1）の 3 つで `pnpm e2e` が通る。`nodejs_compat` は不要。Worker の起動時間は 19 ms。
+- 更新: デプロイした時点の版から先へ進めるのは、利用者の GitHub と Cloudflare の側で行う。アプリには自分を書き換える権限（Cloudflare の API トークン）を持たせない。Workers の編集権限はアカウント全体にしか絞れず、アプリが乗っ取られた時の被害がデータからアカウントの Worker 全体に広がるため。また、元のリポジトリのリリースを確認なしに本番へ入れる形も取らない。
+  - 予定の流れ: 公開のたびに版のタグと GitHub のリリースを作る → アプリは、管理者が設定を開いた時に最新のリリースを 1 日 1 回まで確認し、新しければ管理者にだけ知らせる（環境変数で止められる。家のデータは送らない）→ 「更新する」は利用者のリポジトリの GitHub Actions（手動実行のワークフロー）を開き、ワークフローが最新のリリースを取り込む → Cloudflare の自動ビルドがデプロイし、DB は起動時に整う。
+  - 未確認: Deploy to Cloudflare ボタンが作る複製がフォークか、そのリポジトリが最初から Cloudflare の自動ビルドとつながるか、ワークフローのファイル自体が変わる更新を GitHub Actions の標準のトークンで取り込めるか（できない場合は手順を書く）。
 - 実機の CPU 時間（2026-10-17、Free プラン、`wrangler tail` の `cpuTime`、`scripts/measure.ts` で 20 ラウンドを間隔 0.4 秒で実行した 173 件）。単位は ms:
 
   | 要求 | p50 | p90 | 最大 | 10 超 |
