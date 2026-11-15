@@ -43,5 +43,15 @@
     "vite": "^8.3.4",
     "wrangler": "^4.151.1"
   },
-  "packageManager": "pnpm@10.13.1"
+  "packageManager": "pnpm@10.13.1",
+  "cloudflare": {
+    "bindings": {
+      "PUBLIC_URL": {
+        "description": "このアプリを開く URL（パスなし）。例: `https://okatte.<あなたのサブドメイン>.workers.dev`、独自ドメインなら `https://lists.example.com`。**パスキーはこの URL に結びつく**ので、家族が登録する前に決めてください。分からなければ仮に入れておき、デプロイ後にダッシュボードで直せます。"
+      },
+      "SETUP_TOKEN": {
+        "description": "最初の管理者を作るときに入力する合言葉。長めの文字列にしてください。これがないと、URL を最初に開いた人が誰でも管理者になれます。"
+      }
+    }
+  }
 }

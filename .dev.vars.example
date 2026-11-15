@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development (PUBLIC_URL=http://localhost:8787 there).
+# The Deploy to Cloudflare button asks for these as secrets; their descriptions are in package.json.
+PUBLIC_URL=
+SETUP_TOKEN=

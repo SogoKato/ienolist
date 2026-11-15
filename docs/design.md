@@ -96,6 +96,7 @@
   - Node は起動時に当てる（`_migrations` で記録）。
   - Workers はファイルを読めないため、`pnpm gen` で SQL を `src/db/migrations.generated.ts` に埋め込む（作り忘れるとテストが失敗する）。アイソレートごとの最初の要求で、1 つずつ D1 の `batch`（全部成功するか全部取り消す）で当てる。記録は `wrangler d1 migrations apply` と同じ `d1_migrations` 表に同じ形で書くので、wrangler のコマンドと食い違わない。何もない時は 1 往復で済む。2 つのアイソレートが同時に当てようとした場合は、後の方の `batch` が取り消され、記録を見直して先に当たっていれば続ける。失敗したら 500 を返し、次の要求でやり直す。
 - ローカルの Workers: `.dev.vars` に `PUBLIC_URL=http://localhost:8787` → `pnpm dev`。
+- Deploy to Cloudflare ボタン（README）: 公開リポジトリを利用者の GitHub に複製し、D1 を作ってデプロイする。`.dev.vars.example` の `PUBLIC_URL` と `SETUP_TOKEN` をシークレットとして入力させ、その説明は `package.json` の `cloudflare.bindings` に書く。ダッシュボードで足した変数（`APP_NAME` など）が次のデプロイで消えないよう、`wrangler.jsonc` に `keep_vars: true` を置く。
 - `pnpm e2e`: 実際の HTTP で、セットアップ（ソフトウェアのパスキー）→ クライアント登録 → 同意 → トークン → MCP 操作 → リフレッシュ → 接続の取り消しまでを通す。引数なしだと Node 版を一時 DB で起動して検査する。`BASE_URL=http://localhost:8787 pnpm e2e` で、起動済みの `wrangler dev` などを検査する（その `PUBLIC_URL` は同じ URL で、世帯が未作成であること）。
 - 確認済み: Node 版、`wrangler dev --local`（workerd + ローカル D1）、実際の Cloudflare（workers.dev、D1）の 3 つで `pnpm e2e` が通る。`nodejs_compat` は不要。Worker の起動時間は 19 ms。
 - 更新: デプロイした時点の版から先へ進めるのは、利用者の GitHub と Cloudflare の側で行う。アプリには自分を書き換える権限（Cloudflare の API トークン）を持たせない。Workers の編集権限はアカウント全体にしか絞れず、アプリが乗っ取られた時の被害がデータからアカウントの Worker 全体に広がるため。また、元のリポジトリのリリースを確認なしに本番へ入れる形も取らない。

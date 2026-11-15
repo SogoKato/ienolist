@@ -15,7 +15,8 @@
   // request, recording it where `wrangler d1 migrations apply` does, so that command is optional.
   "d1_databases": [
     { "binding": "DB", "database_name": "okatte", "migrations_dir": "drizzle" }
-  ]
-  // Set PUBLIC_URL (and optionally APP_NAME, SETUP_TOKEN, OAUTH_CLIENTS) as vars or secrets;
-  // for local development put them in .dev.vars, e.g. PUBLIC_URL=http://localhost:8787
+  ],
+  // Set PUBLIC_URL (and optionally APP_NAME, SETUP_TOKEN, OAUTH_CLIENTS) as vars or secrets in the dashboard,
+  // which deploys keep; for local development put them in .dev.vars (see .dev.vars.example).
+  "keep_vars": true
 }
