@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { version } from "../../../package.json"; // Vite keeps only this field in the bundle
 import { accessLabel, api, type Connection, type Member, type Passkey } from "../api";
 import { describeError, guessDeviceName, registerPasskey } from "../passkeys";
 import { useSession } from "../session";
@@ -34,6 +35,7 @@ export function Settings() {
       <section>
         <button onClick={logout}>ログアウト</button>
       </section>
+      <p className="muted">おかって v{version}</p>
     </Page>
   );
 }

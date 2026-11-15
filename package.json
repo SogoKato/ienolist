@@ -1,5 +1,6 @@
 {
   "name": "okatte",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -41,5 +42,6 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "wrangler": "^4.151.1"
-  }
+  },
+  "packageManager": "pnpm@10.13.1"
 }

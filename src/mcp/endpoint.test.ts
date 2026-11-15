@@ -88,6 +88,7 @@ test("legacy: initialize, notifications and tools/list without resultType", asyn
   const init = (await (await post(rpc(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "0" } }))).json()).result;
   assert.equal(init.protocolVersion, "2025-06-18");
   assert.equal(init.serverInfo.name, "okatte");
+  assert.match(init.serverInfo.version, /^\d+\.\d+\.\d+$/); // package.json's, not a placeholder
   const unknown = (await (await post(rpc(1, "initialize", { protocolVersion: "1999-01-01" }))).json()).result;
   assert.equal(unknown.protocolVersion, "2025-11-25");
   assert.equal((await post({ jsonrpc: "2.0", method: "notifications/initialized" })).status, 202);

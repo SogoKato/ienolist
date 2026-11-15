@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true
   },
   "include": ["src", "scripts", "drizzle.config.ts", "web/vite.config.ts", "web/src/**/*.test.ts"]
 }

@@ -99,6 +99,8 @@
 - `pnpm e2e`: 実際の HTTP で、セットアップ（ソフトウェアのパスキー）→ クライアント登録 → 同意 → トークン → MCP 操作 → リフレッシュ → 接続の取り消しまでを通す。引数なしだと Node 版を一時 DB で起動して検査する。`BASE_URL=http://localhost:8787 pnpm e2e` で、起動済みの `wrangler dev` などを検査する（その `PUBLIC_URL` は同じ URL で、世帯が未作成であること）。
 - 確認済み: Node 版、`wrangler dev --local`（workerd + ローカル D1）、実際の Cloudflare（workers.dev、D1）の 3 つで `pnpm e2e` が通る。`nodejs_compat` は不要。Worker の起動時間は 19 ms。
 - 更新: デプロイした時点の版から先へ進めるのは、利用者の GitHub と Cloudflare の側で行う。アプリには自分を書き換える権限（Cloudflare の API トークン）を持たせない。Workers の編集権限はアカウント全体にしか絞れず、アプリが乗っ取られた時の被害がデータからアカウントの Worker 全体に広がるため。また、元のリポジトリのリリースを確認なしに本番へ入れる形も取らない。
+  - 版: `package.json` の `version` だけに書く（セマンティック バージョニング、0.1.0 から）。サーバーは `src/version.ts` から MCP の `serverInfo` に、画面はビルド時に設定の一番下に出す。
+  - リリースの手順: `npm version minor -m "Release v%s"`（または `patch`。`package.json` を書き換え、コミットとタグ `v<版>` を作る）→ `git push origin main v<版>` → GitHub Actions（`.github/workflows/release.yml`）が、タグと `package.json` の一致、型チェック、テスト、ビルドを確かめてリリースの下書きを作る → 下書きの説明を日本語で書き（互換をなくす変更を先頭に）、公開する。下書きのうちは、各家の更新確認には見えない。
   - 予定の流れ: 公開のたびに版のタグと GitHub のリリースを作る → アプリは、管理者が設定を開いた時に最新のリリースを 1 日 1 回まで確認し、新しければ管理者にだけ知らせる（環境変数で止められる。家のデータは送らない）→ 「更新する」は利用者のリポジトリの GitHub Actions（手動実行のワークフロー）を開き、ワークフローが最新のリリースを取り込む → Cloudflare の自動ビルドがデプロイし、DB は起動時に整う。
   - 未確認: Deploy to Cloudflare ボタンが作る複製がフォークか、そのリポジトリが最初から Cloudflare の自動ビルドとつながるか、ワークフローのファイル自体が変わる更新を GitHub Actions の標準のトークンで取り込めるか（できない場合は手順を書く）。
 - 実機の CPU 時間（2026-10-17、Free プラン、`wrangler tail` の `cpuTime`、`scripts/measure.ts` で 20 ラウンドを間隔 0.4 秒で実行した 173 件）。単位は ms:

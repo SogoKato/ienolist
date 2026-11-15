@@ -1,5 +1,6 @@
 import type { Actor, ItemService } from "../items/service.ts";
 import type { RecipeService } from "../recipes/service.ts";
+import { VERSION } from "../version.ts";
 import { createMcpHandler } from "./protocol.ts";
 import { TOOLS_JSON } from "./tools.generated.ts";
 import { INSTRUCTIONS, missingScope, tools, userFacingError } from "./tools.ts";
@@ -16,7 +17,7 @@ export type McpDeps = {
 };
 
 const handle = createMcpHandler({
-  serverInfo: { name: "okatte", version: "0.0.0" },
+  serverInfo: { name: "okatte", version: VERSION },
   tools,
   toolsJson: TOOLS_JSON,
   userFacingError,
