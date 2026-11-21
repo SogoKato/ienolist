@@ -1,14 +1,12 @@
 <p align="center"><img src="web/public/icon-192.png" width="96" height="96" alt=""></p>
 
-<h1 align="center">おかって</h1>
+<h1 align="center">家のリスト</h1>
 
 <p align="center">家族で使う、冷蔵庫リストと買い物リストとレシピ帳。<br>Claude や ChatGPT から、話しかけるだけで動かせます。</p>
 
-<p align="center"><a href="https://deploy.workers.cloudflare.com/?url=https://github.com/SogoKato/okatte"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a></p>
+<p align="center"><a href="https://deploy.workers.cloudflare.com/?url=https://github.com/SogoKato/ienolist"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a></p>
 
-「お勝手」は台所の古い言い方です。勝手口から人が出入りするように、あなたのアシスタントが裏口からリストを読み書きします。
-
-おかっては、自分の家族のために自分でデプロイして使う（セルフホストする）Web アプリです。データはあなたの Cloudflare アカウント（またはあなたのサーバー）の中だけに置かれます。
+家のリスト（ienolist）は、自分の家族のために自分でデプロイして使う（セルフホストする）Web アプリです。データはあなたの Cloudflare アカウント（またはあなたのサーバー）の中だけに置かれます。
 
 ## できること
 
@@ -40,7 +38,7 @@ Cloudflare の無料プラン（Workers と D1）で、1 家族の利用には�
 1. 上の **Deploy to Cloudflare** ボタンを押します。
 2. Cloudflare のセットアップ画面で、次を決めます。
    - **Git account**: GitHub を選びます。あなたの GitHub に、このリポジトリの複製が作られます。
-   - **Project name**: 例 `okatte`。リポジトリ、Worker、データベースの名前になり、アプリの URL は `https://okatte.あなたのサブドメイン.workers.dev` になります（サブドメインは、ダッシュボードの「Workers & Pages」の右側に表示されています）。
+   - **Project name**: 例 `ienolist`。リポジトリ、Worker、データベースの名前になり、アプリの URL は `https://ienolist.あなたのサブドメイン.workers.dev` になります（サブドメインは、ダッシュボードの「Workers & Pages」の右側に表示されています）。
    - **D1 データベース**: 「Create new」のまま、新しく作ります。
    - **`SETUP_TOKEN`**: 最初の管理者を作るときの合言葉です。長めの文字列にして、控えておいてください。
    - **Enable Preview builds**: オフにします。オンのままだと、`main` 以外のブランチへの push でプレビュー版がデプロイされ、同じデータベースを使うためです。
@@ -52,8 +50,8 @@ Cloudflare の無料プラン（Workers と D1）で、1 家族の利用には�
 ボタンを使わない場合や、手元から操作したい場合です。Node.js 24 以上と pnpm が必要です。
 
 ```sh
-git clone https://github.com/SogoKato/okatte.git
-cd okatte
+git clone https://github.com/SogoKato/ienolist.git
+cd ienolist
 pnpm install
 npx wrangler login
 pnpm run deploy
@@ -73,7 +71,7 @@ pnpm run deploy
 
 ```sh
 cp wrangler.jsonc wrangler.parents.jsonc   # wrangler.*.jsonc は Git の管理外
-# wrangler.parents.jsonc の "name" と "database_name" を、例えば okatte-parents に変える
+# wrangler.parents.jsonc の "name" と "database_name" を、例えば ienolist-parents に変える
 pnpm build && npx wrangler deploy -c wrangler.parents.jsonc
 ```
 
@@ -92,23 +90,23 @@ pnpm build && npx wrangler deploy -c wrangler.parents.jsonc
 
 「設定」→「Claude や ChatGPT とつなぐ」に、頼み方の例と、Claude と ChatGPT それぞれのつなぎ方があります。
 
-つなぐ URL は、アプリの URL の後ろに `/mcp` を付けたもの（例 `https://okatte.example.workers.dev/mcp`）です。
+つなぐ URL は、アプリの URL の後ろに `/mcp` を付けたもの（例 `https://ienolist.example.workers.dev/mcp`）です。
 
 - **Claude**: 設定の「コネクタ」で「カスタムコネクタを追加」を選び、名前（家の名前など）と URL を入れます。
 - **ChatGPT**: ブラウザで ChatGPT を開き、プラグインの画面で「追加」→「カスタム MCP サーバーを追加」を選び、「サーバーURL」に入れます（ChatGPT のスマホアプリからは追加できません）。
 
-どちらも、追加するとおかってのログインと同意の画面が開くので、パスキーでログインして許可します。
+どちらも、追加すると家のリストのログインと同意の画面が開くので、パスキーでログインして許可します。
 
 ## 更新する
 
-新しい版は [Releases](https://github.com/SogoKato/okatte/releases) で公開します。リポジトリの「Watch」→「Custom」→「Releases」を選ぶと、公開のたびに GitHub から通知が届きます。データベースの変更は、新しい版の最初のアクセスで自動的に当たるので、コードを入れ替えるだけで更新できます。
+新しい版は [Releases](https://github.com/SogoKato/ienolist/releases) で公開します。リポジトリの「Watch」→「Custom」→「Releases」を選ぶと、公開のたびに GitHub から通知が届きます。データベースの変更は、新しい版の最初のアクセスで自動的に当たるので、コードを入れ替えるだけで更新できます。
 
 **ボタンでデプロイした場合**、あなたの GitHub のリポジトリに変更を取り込むと、Cloudflare が自動でデプロイします。
 
 ```sh
-git clone https://github.com/<あなた>/okatte.git
-cd okatte
-git remote add upstream https://github.com/SogoKato/okatte.git
+git clone https://github.com/<あなた>/ienolist.git
+cd ienolist
+git remote add upstream https://github.com/SogoKato/ienolist.git
 git pull upstream main
 git push
 ```
@@ -131,7 +129,7 @@ Cloudflare では Worker の Variables and Secrets、Node では環境変数で�
 |---|---|---|
 | `PUBLIC_URL` | Node のみ必須 | アプリを開く URL（パスなし）。https のみ（localhost は http も可）。Cloudflare では、設定しなければ開いた URL をそのまま使い、設定するとそのドメインだけで使えます |
 | `SETUP_TOKEN` | 強く推奨 | 最初の管理者を作るときの合言葉。設定しないと、最初にアクセスした人が管理者になります |
-| `APP_NAME` | | パスキーの登録画面に出る名前。既定は「おかって」 |
+| `APP_NAME` | | パスキーの登録画面に出る名前。既定は「家のリスト」 |
 | `OAUTH_CLIENTS` | | 自分で登録できないアシスタント用の、事前登録クライアント。JSON の配列 `[{"clientId", "name", "redirectUris": [...]}]` |
 | `DATABASE_PATH` | | Node のみ。SQLite のファイル。既定は `./data/app.db` |
 | `PORT` | | Node のみ。既定は `8787` |

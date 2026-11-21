@@ -35,7 +35,7 @@ export function Settings() {
       <section>
         <button onClick={logout}>ログアウト</button>
       </section>
-      <p className="muted">おかって v{version}</p>
+      <p className="muted">家のリスト v{version}</p>
     </Page>
   );
 }

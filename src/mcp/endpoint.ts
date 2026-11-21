@@ -17,7 +17,7 @@ export type McpDeps = {
 };
 
 const handle = createMcpHandler({
-  serverInfo: { name: "okatte", version: VERSION },
+  serverInfo: { name: "ienolist", version: VERSION },
   tools,
   toolsJson: TOOLS_JSON,
   userFacingError,

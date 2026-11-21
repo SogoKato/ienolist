@@ -48,7 +48,7 @@ test("pages carry the same protections as the API", async () => {
 test("the files outside the web root cannot be reached", async () => {
   for (const path of ["/../package.json", "/%2e%2e/package.json", "/assets/../../package.json"]) {
     const res = await get(path);
-    assert.doesNotMatch(await res.text(), /"name": "okatte"/, path);
+    assert.doesNotMatch(await res.text(), /"name": "ienolist"/, path);
   }
 });
 

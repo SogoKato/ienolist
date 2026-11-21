@@ -88,7 +88,7 @@ test("an item can be edited, moved back with the ticked ones and deleted", async
 test("signing out and back in with the passkey brings the lists back", async () => {
   await aki.getByRole("link", { name: "設定" }).click();
   await expect(aki.getByRole("heading", { name: "パスキー" })).toBeVisible();
-  await expect(aki.getByText(/^おかって v\d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(aki.getByText(/^家のリスト v\d+\.\d+\.\d+$/)).toBeVisible();
   await aki.getByRole("button", { name: "ログアウト" }).click();
   await expect(aki).toHaveURL(/\/login$/);
 
